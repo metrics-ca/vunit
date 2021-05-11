@@ -126,15 +126,15 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
    #     ).splitlines()[0]
 
 
-    def setup_library_mapping(self, project):
-        """
-        Compile project using vhdl_standard
-        """
-        mapped_libraries = self._get_mapped_libraries()
+  # def setup_library_mapping(self, project):
+  #     """
+  #     Compile project using vhdl_standard
+  #     """
+  #     mapped_libraries = self._get_mapped_libraries()
 
-        for library in project.get_libraries():
-            self._libraries.append(library)
-            self.create_library(library.name, library.directory, mapped_libraries)
+  #     for library in project.get_libraries():
+  #         self._libraries.append(library)
+  #         self.create_library(library.name, library.directory, mapped_libraries)
 
     def compile_source_file_command(self, source_file):
         """
@@ -247,10 +247,10 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         #args += ["-makelib %s" % source_file.library.name]
         #args += ['"%s"' % source_file.name]
         #args += ["-endlib"]
-        #argsfile = str(
-        #    Path(self._output_path)
-        #    / ("metrics_compile_verilog_file_%s.args" % source_file.library.name)
-        #)
+        argsfile = str(
+            Path(self._output_path)
+            / ("metrics_compile_verilog_file_%s.args" % source_file.library.name)
+        )
         write_file(argsfile, "\n".join(args))
         return [cmd, "-f", argsfile]
 
@@ -279,7 +279,7 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         """
         Get mapped libraries from cds.lib file
         """
-        cds = CDSFile.parse(self._cdslib)
+        #cds = CDSFile.parse(self._cdslib)
         return cds
 
     def simulate(  # pylint: disable=too-many-locals
