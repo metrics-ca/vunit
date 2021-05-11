@@ -11,7 +11,9 @@ SystemVerilog UART
 A more realistic test bench of an UART to show VUnit SystemVerilog
 usage on a typical module.
 """
-
+import sys
+sys.path.append("/home2/asutton/repos/forks/vunit")
+import vunit
 from pathlib import Path
 from vunit.verilog import VUnit
 
