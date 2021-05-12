@@ -220,11 +220,12 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         # "cds.lib Invalid environment variable ''."
         #args += ["-nowarn DLCVAR"]
         args += ["-work work"]
+        args += ["-lib work"]
         args += source_file.compile_options.get("metrics.dsim__verilog_flags", [])
         #args += ['-cdslib "%s"' % self._cdslib]
         #args += self._hdlvar_args()
         args += [
-            '-l "%s"'
+            '-l %s'
             % str(
                 Path(self._output_path)
                 / ("metrics_compile_verilog_file_%s.log" % source_file.library.name)
@@ -236,7 +237,7 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
       #      args += ["-messages"]
       #      args += ["-libverbose"]
         for include_dir in source_file.include_dirs:
-            args += ['+incdir+"%s"' % include_dir]
+            args += ['+incdir+%s' % include_dir]
 
         # for "disciplines.vams" etc.
        # args += ['-incdir "%s/tools/spectre/etc/ahdl/"' % self._cds_root_irun]
@@ -245,7 +246,7 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         #    args += ["+define+%s=%s" % (key, value.replace('"', '\\"'))]
         #args += ['-nclibdirname "%s"' % str(Path(source_file.library.directory).parent)]
         #args += ["-makelib %s" % source_file.library.name]
-        #args += ['"%s"' % source_file.name]
+        args += ['%s' % source_file.name]
         #args += ["-endlib"]
         argsfile = str(
             Path(self._output_path)
