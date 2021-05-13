@@ -135,7 +135,16 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
   #     for library in project.get_libraries():
   #         self._libraries.append(library)
   #         self.create_library(library.name, library.directory, mapped_libraries)
+    def setup_library_mapping(self, project):
+        """
+        Setup library mapping
+        """
+        #mapped_libraries = self._get_mapped_libraries()
 
+        for library in project.get_libraries():
+            self._libraries.append(library)
+            #self.create_library(library.name, library.directory, mapped_libraries)
+            
     def compile_source_file_command(self, source_file):
         """
         Returns the command to compile a single source file
@@ -207,9 +216,9 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         """
         Returns commands to compile a Verilog file
         """
-        cmd = str(Path(self._prefix) / "dsim")
+        cmd = str(Path(self._prefix) / "dvlcom")
         args = []
-        args += ["-genimage image"]
+        #args += ["-genimage image"]
         #args += ["-compile"]
         #args += ["-nocopyright"]
         #args += ["-licqueue"]
@@ -219,8 +228,11 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         #args += ["-nowarn DLCPTH"]
         # "cds.lib Invalid environment variable ''."
         #args += ["-nowarn DLCVAR"]
-        args += ["-work work"]
-        args += ["-lib work"]
+        #args += ["-work work"]
+        #for library in self._libraries:
+        args += ["-work", source_file.library.directory.rstrip(source_file.library.name)]
+        args += ["-lib", source_file.library.name]
+        #args += ["-lib work"]
         args += source_file.compile_options.get("metrics.dsim__verilog_flags", [])
         #args += ['-cdslib "%s"' % self._cdslib]
         #args += self._hdlvar_args()
@@ -310,7 +322,7 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
             # args += ['-rebuild']
             # args += ['-gdb']
             # args += ['-gdbelab']
-            args += ["-exit-on-error 10"]
+            args += ["-exit-on-error 2"]
             #args += ["-nowarn WRMNZD"]
             #args += ["-nowarn DLCPTH"]  # "cds.lib Invalid path"
             #args += ["-nowarn DLCVAR"]  # "cds.lib Invalid environment variable ''."
@@ -323,33 +335,31 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
             #args += [
             #    "-ncerror EVBNAT"
             #]  # promote to error: "bad natural literal in generic association"
-            args += ["-work work"]
+            #args += ["-work work"]
             #args += [
             #    '-nclibdirname "%s"' % (str(Path(self._output_path) / "libraries"))
             #]  # @TODO: ugly
             args += config.sim_options.get("metrics.dsim_sim_flags", [])
             #args += ['-cdslib "%s"' % self._cdslib]
             # TBD #args += self._hdlvar_args()
-            args += ['-l "%s"' % str(Path(script_path) / ("dsim_%s.log" % step))]
+            args += ['-l %s' % str(Path(script_path) / ("dsim_%s.log" % step))]
             #if not self._log_level == "debug":
             #    args += ["-quiet"]
             #else:
             #    args += ["-messages"]
                 # args += ['-libverbose']
-            args += self._generic_args(config.entity_name, config.generics)
-            #for library in self._libraries:
-            #    args += ['-reflib "%s"' % library.directory]
-            #if launch_gui:
-            #    args += ["-access +rwc"]
-                # args += ['-linedebug']
-            #    args += ["-gui"]
-#            else:
-            args += ["-access +b"]
-                #args += ['-input "@run"']
+            #args += self._generic_args(config.entity_name, config.generics)
+            for library in self._libraries:
+                #args += ['-L %s' % library.directory]
+                args += ['-L %s' % library.name]
+            args += ['-work %s' % library.directory.rstrip(library.name)]
+           
+            args += ["+acc+b"]
+
 
             if config.architecture_name is None:
                 # we have a SystemVerilog toplevel:
-                args += ["-top %s.%s:sv" % (config.library_name, config.entity_name)]
+                args += ["-top %s.%s" % (config.library_name, config.entity_name)]
             else:
                 # we have a VHDL toplevel:
                 args += [
