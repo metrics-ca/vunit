@@ -18,7 +18,6 @@ from ..exceptions import CompileError
 from ..ostools import write_file, file_exists
 from ..vhdl_standard import VHDL
 from . import SimulatorInterface, run_command, ListOfStringOption
-from .cds_file import CDSFile
 
 LOGGER = logging.getLogger(__name__)
 
@@ -56,16 +55,6 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
             default=None,
             help="Save .vcd or .fst",
         )
-        #group.add_argument(
-        #    "--cdslib",
-        #    default=None,
-        #    help="The cds.lib file to use. If not given, VUnit maintains its own cds.lib file.",
-        #)
-        #group.add_argument(
-        #    "--hdlvar",
-        #    default=None,
-        #    help="The hdl.var file to use. If not given, VUnit does not use a hdl.var file.",
-        #)
 
     @classmethod
     def from_args(cls, args, output_path, **kwargs):
@@ -77,8 +66,6 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
             output_path=output_path,
             log_level=args.log_level,
             gui=args.gui,
-            #cdslib=args.cdslib,
-            #hdlvar=args.hdlvar,
         )
 
     @classmethod
@@ -96,19 +83,12 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         return False
 
     def __init__(  # pylint: disable=too-many-arguments
-        self, prefix, output_path, gui=False, log_level=None, cdslib=None, hdlvar=None
+        self, prefix, output_path, gui=False, log_level=None
     ):
         SimulatorInterface.__init__(self, output_path, gui)
         self._prefix = prefix
         self._libraries = []
         self._log_level = log_level
-       # if cdslib is None:
-       #     self._cdslib = str((Path(output_path) / "cds.lib").resolve())
-       # else:
-       #     self._cdslib = str(Path(cdslib).resolve())
-        #self._hdlvar = hdlvar
-        #self._metrics_root_dsim = self.find_metrics_root_dsim()
-        #self._create_cdslib()
 
     @classmethod
     def find_prefix_from_path(cls):
@@ -117,33 +97,14 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         """
         return cls.find_toolchain([cls.executable])
     
-   # def find_metrics_root_dsim(self):
-   #     """
-   #     Finds irun cds root
-   #     """
-   #     return subprocess.check_output(
-   #         [str(Path(self._prefix) / "cds_root"), "irun"]
-   #     ).splitlines()[0]
-
-
-  # def setup_library_mapping(self, project):
-  #     """
-  #     Compile project using vhdl_standard
-  #     """
-  #     mapped_libraries = self._get_mapped_libraries()
-
-  #     for library in project.get_libraries():
-  #         self._libraries.append(library)
-  #         self.create_library(library.name, library.directory, mapped_libraries)
+  
     def setup_library_mapping(self, project):
         """
         Setup library mapping
         """
-        #mapped_libraries = self._get_mapped_libraries()
-
         for library in project.get_libraries():
             self._libraries.append(library)
-            #self.create_library(library.name, library.directory, mapped_libraries)
+
             
     def compile_source_file_command(self, source_file):
         """
@@ -157,60 +118,13 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
 
         raise CompileError
 
-    @staticmethod
-    def _vhdl_std_opt(vhdl_standard):
-        """
-        Convert standard to format of irun command line flag
-        """
-        if vhdl_standard == VHDL.STD_2002:
-            return "-v200x -extv200x"
 
-        if vhdl_standard == VHDL.STD_2008:
-            return "-v200x -extv200x"
-
-        if vhdl_standard == VHDL.STD_1993:
-            return "-v93"
-
-        raise ValueError("Invalid VHDL standard %s" % vhdl_standard)
-
-    def compile_vhdl_file_command(self, source_file):
+    #def compile_vhdl_file_command(self, source_file):
         """
         Returns command to compile a VHDL file
         """
-        cmd = str(Path(self._prefix) / "irun")
-        args = []
-        args += ["-compile"]
-        args += ["-nocopyright"]
-        args += ["-licqueue"]
-        args += ["-nowarn DLCPTH"]  # "cds.lib Invalid path"
-        args += ["-nowarn DLCVAR"]  # "cds.lib Invalid environment variable ''."
-        args += ["%s" % self._vhdl_std_opt(source_file.get_vhdl_standard())]
-        args += ["-work work"]
-        args += ['-cdslib "%s"' % self._cdslib]
-       # args += self._hdlvar_args()
-        args += [
-            '-log "%s"'
-            % str(
-                Path(self._output_path)
-                / ("irun_compile_vhdl_file_%s.log" % source_file.library.name)
-            )
-        ]
-        if not self._log_level == "debug":
-            args += ["-quiet"]
-        else:
-            args += ["-messages"]
-            args += ["-libverbose"]
-        args += source_file.compile_options.get("incisive.irun_vhdl_flags", [])
-        args += ['-nclibdirname "%s"' % str(Path(source_file.library.directory).parent)]
-        args += ["-makelib %s" % source_file.library.directory]
-        args += ['"%s"' % source_file.name]
-        args += ["-endlib"]
-        argsfile = str(
-            Path(self._output_path)
-            / ("irun_compile_vhdl_file_%s.args" % source_file.library.name)
-        )
-        write_file(argsfile, "\n".join(args))
-        return [cmd, "-f", argsfile]
+    # VHDL not currently supported by Metrics
+   
 
     def compile_verilog_file_command(self, source_file):
         """
@@ -218,24 +132,9 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         """
         cmd = str(Path(self._prefix) / "dvlcom")
         args = []
-        #args += ["-genimage image"]
-        #args += ["-compile"]
-        #args += ["-nocopyright"]
-        #args += ["-licqueue"]
-        # "Ignored unexpected semicolon following SystemVerilog description keyword (endfunction)."
-        #args += ["-nowarn UEXPSC"]
-        # "cds.lib Invalid path"
-        #args += ["-nowarn DLCPTH"]
-        # "cds.lib Invalid environment variable ''."
-        #args += ["-nowarn DLCVAR"]
-        #args += ["-work work"]
-        #for library in self._libraries:
         args += ["-work", source_file.library.directory.rstrip(source_file.library.name)]
         args += ["-lib", source_file.library.name]
-        #args += ["-lib work"]
-        args += source_file.compile_options.get("metrics.dsim__verilog_flags", [])
-        #args += ['-cdslib "%s"' % self._cdslib]
-        #args += self._hdlvar_args()
+        args += source_file.compile_options.get("metrics.dsim_verilog_flags", [])
         args += [
             '-l %s'
             % str(
@@ -243,23 +142,12 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
                 / ("metrics_compile_verilog_file_%s.log" % source_file.library.name)
             )
         ]
-      #  if not self._log_level == "debug":
-      #      args += ["-quiet"]
-      #  else:
-      #      args += ["-messages"]
-      #      args += ["-libverbose"]
+
         for include_dir in source_file.include_dirs:
             args += ['+incdir+%s' % include_dir]
 
-        # for "disciplines.vams" etc.
-       # args += ['-incdir "%s/tools/spectre/etc/ahdl/"' % self._cds_root_irun]
-
-        #for key, value in source_file.defines.items():
-        #    args += ["+define+%s=%s" % (key, value.replace('"', '\\"'))]
-        #args += ['-nclibdirname "%s"' % str(Path(source_file.library.directory).parent)]
-        #args += ["-makelib %s" % source_file.library.name]
+        
         args += ['%s' % source_file.name]
-        #args += ["-endlib"]
         argsfile = str(
             Path(self._output_path)
             / ("metrics_compile_verilog_file_%s.args" % source_file.library.name)
@@ -267,10 +155,11 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         write_file(argsfile, "\n".join(args))
         return [cmd, "-f", argsfile]
 
+
     def create_library(self, library_name, library_path, mapped_libraries=None):
-        """
-        Create and map a library_name to library_path
-        """
+
+        #Create and map a library_name to library_path
+
         mapped_libraries = mapped_libraries if mapped_libraries is not None else {}
 
         lpath = str(Path(library_path).resolve().parent)
@@ -288,12 +177,6 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         cds[library_name] = library_path
         cds.write(self._cdslib)
 
-    def _get_mapped_libraries(self):
-        """
-        Get mapped libraries from cds.lib file
-        """
-        #cds = CDSFile.parse(self._cdslib)
-        return cds
 
     def simulate(  # pylint: disable=too-many-locals
         self, output_path, test_suite_name, config, elaborate_only=False
@@ -305,52 +188,23 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         script_path = str(Path(output_path) / self.name)
         launch_gui = self._gui is not False and not elaborate_only
 
-        if elaborate_only:
-            steps = ["elaborate"]
-        else:
-            steps = ["elaborate", "simulate"]
 
+        steps = ["simulate"]
+        #TO DO - eliminate the for loop
         for step in steps:
             cmd = str(Path(self._prefix) / "dsim")
             args = []
-            #if step == "elaborate":
-            #    args += ["-elaborate"]
-            #args += ["-nocopyright"]
-            #args += ["-licqueue"]
-            # args += ['-dumpstack']
-            # args += ['-gdbsh']
-            # args += ['-rebuild']
-            # args += ['-gdb']
-            # args += ['-gdbelab']
             args += ["-exit-on-error 2"]
-            #args += ["-nowarn WRMNZD"]
-            #args += ["-nowarn DLCPTH"]  # "cds.lib Invalid path"
-            #args += ["-nowarn DLCVAR"]  # "cds.lib Invalid environment variable ''."
-            #args += [
-            #    "-ncerror EVBBOL"
-            #]  # promote to error: "bad boolean literal in generic association"
-            #args += [
-            #    "-ncerror EVBSTR"
-            #]  # promote to error: "bad string literal in generic association"
-            #args += [
-            #    "-ncerror EVBNAT"
-            #]  # promote to error: "bad natural literal in generic association"
-            #args += ["-work work"]
-            #args += [
-            #    '-nclibdirname "%s"' % (str(Path(self._output_path) / "libraries"))
-            #]  # @TODO: ugly
+
             args += config.sim_options.get("metrics.dsim_sim_flags", [])
-            #args += ['-cdslib "%s"' % self._cdslib]
-            # TBD #args += self._hdlvar_args()
             args += ['-l %s' % str(Path(script_path) / ("dsim_%s.log" % step))]
-            #if not self._log_level == "debug":
-            #    args += ["-quiet"]
-            #else:
-            #    args += ["-messages"]
-                # args += ['-libverbose']
+            
             #args += self._generic_args(config.entity_name, config.generics)
+            #args += ['-defparam runner_cfg="%s"' % config.generics["runner_cfg"]]
+            runner_cfg = config.generics["runner_cfg"]
+            print('runner_cfg = ' + runner_cfg)
+            args += ['-defparam runner_cfg=\"%s\"' % runner_cfg]
             for library in self._libraries:
-                #args += ['-L %s' % library.directory]
                 args += ['-L %s' % library.name]
             args += ['-work %s' % library.directory.rstrip(library.name)]
            
@@ -380,13 +234,6 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
                 return False
         return True
 
-   # def _hdlvar_args(self):
-   #     """
-   #     Return hdlvar argument if available
-   #     """
-   #     if self._hdlvar is None:
-   #         return []
-   #     return ['-hdlvar "%s"' % self._hdlvar]
 
    # @staticmethod
    # def _generic_args(entity_name, generics):
