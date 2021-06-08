@@ -32,7 +32,6 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
     name = "metrics"
     executable = environ.get("DSIM_HOME", "bin")
     supports_gui_flag = False
-    package_users_depend_on_bodies = False #TBD
 
     compile_options = [
         ListOfStringOption("metrics.dsim_vhdl_flags"),
@@ -155,99 +154,37 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         write_file(argsfile, "\n".join(args))
         return [cmd, "-f", argsfile]
 
-
-    def create_library(self, library_name, library_path, mapped_libraries=None):
-
-        #Create and map a library_name to library_path
-
-        mapped_libraries = mapped_libraries if mapped_libraries is not None else {}
-
-        lpath = str(Path(library_path).resolve().parent)
-
-        if not file_exists(lpath):
-            os.makedirs(lpath)
-
-        if (
-            library_name in mapped_libraries
-            and mapped_libraries[library_name] == library_path
-        ):
-            return
-
-        cds = CDSFile.parse(self._cdslib)
-        cds[library_name] = library_path
-        cds.write(self._cdslib)
-
-
     def simulate(  # pylint: disable=too-many-locals
-        self, output_path, test_suite_name, config, elaborate_only=False
-    ):
+            self, output_path, test_suite_name, config, elaborate_only=False):
         """
-        Elaborates and Simulates with entity as top level using generics
+        Elaborates and Simulates
         """
 
         script_path = str(Path(output_path) / self.name)
-        launch_gui = self._gui is not False and not elaborate_only
 
-
-        steps = ["simulate"]
-        #TO DO - eliminate the for loop
-        for step in steps:
-            cmd = str(Path(self._prefix) / "dsim")
-            args = []
-            args += ["-exit-on-error 2"]
-
-            args += config.sim_options.get("metrics.dsim_sim_flags", [])
-            args += ['-l %s' % str(Path(script_path) / ("dsim_%s.log" % step))]
+        cmd = str(Path(self._prefix) / "dsim")
+        args = []
+        args += ["-exit-on-error 2"]
+        args += config.sim_options.get("metrics.dsim_sim_flags", [])
+        args += ['-l %s' % str(Path(script_path) / ("dsim_simulate.log"))]
             
-            #args += self._generic_args(config.entity_name, config.generics)
-            #args += ['-defparam runner_cfg="%s"' % config.generics["runner_cfg"]]
-            runner_cfg = config.generics["runner_cfg"]
-            print('runner_cfg = ' + runner_cfg)
-            args += ['-defparam runner_cfg=\"%s\"' % runner_cfg]
-            for library in self._libraries:
-                args += ['-L %s' % library.name]
-            args += ['-work %s' % library.directory.rstrip(library.name)]
-           
-            args += ["+acc+b"]
+        runner_cfg = config.generics["runner_cfg"]
+        print('runner_cfg = ' + runner_cfg)
+        args += ['-defparam runner_cfg=\"%s\"' % runner_cfg]
+        for library in self._libraries:
+            args += ['-L %s' % library.name]
 
-
-            if config.architecture_name is None:
-                # we have a SystemVerilog toplevel:
-                args += ["-top %s.%s" % (config.library_name, config.entity_name)]
-            else:
-                # we have a VHDL toplevel:
-                args += [
-                    "-top %s.%s:%s"
-                    % (
-                        config.library_name,
-                        config.entity_name,
-                        config.architecture_name,
-                    )
-                ]
-            argsfile = "%s/dsim_%s.args" % (script_path, step)
-            write_file(argsfile, "\n".join(args))
-            if not run_command(
-                [cmd, "-f", relpath(argsfile, script_path)],
-                cwd=script_path,
-                env=self.get_env(),
-            ):
-                return False
+        args += ['-work %s' % library.directory.rstrip(library.name)]
+        args += ["+acc+b"]
+        args += ["-top %s.%s" % (config.library_name, config.entity_name)]
+            
+        argsfile = "%s/dsim_simulate.args" % (script_path)
+        write_file(argsfile, "\n".join(args))
+        if not run_command(
+            [cmd, "-f", relpath(argsfile, script_path)],
+            cwd=script_path,
+            env=self.get_env(),
+        ):
+            return False
         return True
 
-
-   # @staticmethod
-   # def _generic_args(entity_name, generics):
-   #     """
-   #     Create irun arguments for generics/parameters
-   #     """
-   #     args = []
-   #     for name, value in generics.items():
-   #         if _generic_needs_quoting(value):
-   #             args += ['''-gpg "%s.%s => \\"%s\\""''' % (entity_name, name, value)]
-   #         else:
-   #             args += ['''-gpg "%s.%s => %s"''' % (entity_name, name, value)]
-   #     return args
-
-
-#def _generic_needs_quoting(value):  # pylint: disable=missing-docstring
-#    return isinstance(value, (str, bool))
