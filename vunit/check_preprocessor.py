@@ -39,7 +39,7 @@ class CheckPreprocessor(object):
                 offset_to_point_before_closing_paranthesis,
             ) = self._extract_relation(code, match)
             if relation:
-                context_msg_parameter = ", context_msg => %s" % relation.make_context_msg()
+                context_msg_parameter = f", context_msg => {relation.make_context_msg()!s}"
                 code = (
                     code[: match.end("parameters") + offset_to_point_before_closing_paranthesis]
                     + context_msg_parameter
@@ -81,7 +81,7 @@ class CheckPreprocessor(object):
 
         if not relation:
             raise SyntaxError(
-                "Failed to find relation in %s" % code[check.start("call") : check.end("parameters") + index]
+                f"Failed to find relation in {(code[check.start('call') : check.end('parameters') + index])!s}"
             )
 
         return relation, index - 1
@@ -221,7 +221,7 @@ class Relation(object):
         self._right = right
 
     def make_context_msg(self):
-        return '"Expected %s %s %s. Left is " & to_string(%s) & ". Right is " & to_string(%s) & "."' % (
+        return f'"Expected {0!s} {1!s} {2!s}. Left is " & to_string({3!s}) & ". Right is " & to_string({4!s}) & "."'.format(
             self._left.replace('"', '""'),
             self._operand,
             self._right.replace('"', '""'),
