@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2020, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2021, Lars Asplund lars.anders.asplund@gmail.com
 
 from pathlib import Path
 from vunit.verilog import VUnit
@@ -29,9 +29,7 @@ def configure_tb_with_parameter_config():
 
     tests[3].add_config(
         "cfg",
-        parameters=dict(
-            set_parameter="set-for-test", config_parameter="set-from-config"
-        ),
+        parameters=dict(set_parameter="set-for-test", config_parameter="set-from-config"),
     )
 
     def post_check(output_path):
@@ -40,9 +38,7 @@ def configure_tb_with_parameter_config():
 
     tests[4].add_config(
         "cfg",
-        parameters=dict(
-            set_parameter="set-from-config", config_parameter="set-from-config"
-        ),
+        parameters=dict(set_parameter="set-from-config", config_parameter="set-from-config"),
         post_check=post_check,
     )
 
@@ -58,7 +54,5 @@ def configure_tb_same_sim_all_pass(ui):
 
 configure_tb_with_parameter_config()
 configure_tb_same_sim_all_pass(VU)
-LIB.module("tb_other_file_tests").scan_tests_from_file(
-    str(ROOT / "other_file_tests.sv")
-)
+LIB.module("tb_other_file_tests").scan_tests_from_file(str(ROOT / "other_file_tests.sv"))
 VU.main()

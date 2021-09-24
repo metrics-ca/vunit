@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2020, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2021, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 Helper functions to generate examples.rst from docstrings in run.py files
@@ -33,8 +33,7 @@ def examples():
             if loc.is_dir():
                 _data = _get_eg_doc(
                     loc,
-                    "https://github.com/VUnit/vunit/tree/master/examples/%s/%s"
-                    % (subdir, item),
+                    "https://github.com/VUnit/vunit/tree/master/examples/%s/%s" % (subdir, item),
                 )
                 if _data:
                     egs_fptr.write(_data)
@@ -47,11 +46,7 @@ def _get_eg_doc(location: Path, ref):
     nstr = str(location.name)
 
     if not (location / "run.py").is_file():
-        print(
-            "WARNING: Example subdir '"
-            + nstr
-            + "' does not contain a 'run.py' file. Skipping..."
-        )
+        print("WARNING: Example subdir '" + nstr + "' does not contain a 'run.py' file. Skipping...")
         return None
 
     print("Generating '_main.py' from 'run.py' in '" + nstr + "'...")
@@ -70,11 +65,7 @@ def _get_eg_doc(location: Path, ref):
     remove(str(location / "_main.py"))
 
     if not eg_doc:
-        print(
-            "WARNING: 'run.py' file in example subdir '"
-            + nstr
-            + "' does not contain a docstring. Skipping..."
-        )
+        print("WARNING: 'run.py' file in example subdir '" + nstr + "' does not contain a docstring. Skipping...")
         return ""
 
     title = "`%s <%s/>`_" % (eg_doc.split("---", 1)[0][0:-1], ref)

@@ -5,10 +5,13 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
+[tool.black]
+line-length = 120
+
 [tool.tox]
 legacy_tox_ini = """
 [tox]
-envlist = py{36,37,38}-{fmt,unit,lint,docs}, py{36,37,38}-{acceptance,vcomponents}-{activehdl,ghdl,modelsim,rivierapro}, py{36,37,38}-coverage
+envlist = py{36,37,38,39}-{fmt,unit,lint,docs}, py{36,37,38,39}-{acceptance,vcomponents}-{activehdl,ghdl,modelsim,rivierapro}, py{36,37,38,39}-coverage
 skip_missing_interpreters = True
 isolated_build = True
 
@@ -27,7 +30,7 @@ deps=
     coverage: pylint
     coverage: mypy
     docs: docutils
-    docs: sphinx==3.3.1
+    docs: sphinx
     docs: sphinx-argparse
 
 setenv=

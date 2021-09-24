@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2020, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2021, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 Array
@@ -21,9 +21,7 @@ VU.add_osvvm()
 
 SRC_PATH = Path(__file__).parent / "src"
 
-VU.add_library("lib").add_source_files(
-    [SRC_PATH / "*.vhd", SRC_PATH / "test" / "*.vhd"]
-)
+VU.add_library("lib").add_source_files([SRC_PATH / "*.vhd", SRC_PATH / "test" / "*.vhd"])
 
 VU.set_compile_option("ghdl.flags", ["-frelaxed"])
 VU.set_sim_option("ghdl.elab_flags", ["-frelaxed"])

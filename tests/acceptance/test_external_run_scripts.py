@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2020, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2021, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 Verify that all external run scripts work correctly
@@ -155,9 +155,7 @@ class TestExternalRunScripts(unittest.TestCase):
             ],
         )
 
-    @unittest.skipUnless(
-        simulator_is("ghdl"), "Support complex JSON strings as generic"
-    )
+    @unittest.skipUnless(simulator_is("ghdl"), "Support complex JSON strings as generic")
     def test_vhdl_json4vhdl_example_project(self):
         self.check(str(ROOT / "examples" / "vhdl" / "json4vhdl" / "run.py"))
 
@@ -170,9 +168,25 @@ class TestExternalRunScripts(unittest.TestCase):
     def test_vhdl_axi_dma_example_project(self):
         self.check(str(ROOT / "examples" / "vhdl" / "axi_dma" / "run.py"))
 
+    @unittest.skipIf(
+        simulator_check(lambda simclass: not simclass.supports_vhdl_contexts()),
+        "This simulator/backend does not support VHDL contexts",
+    )
     def test_vhdl_user_guide_example_project(self):
+        self.check(str(ROOT / "examples" / "vhdl" / "user_guide" / "run.py"), exit_code=1)
+        check_report(
+            self.report_file,
+            [
+                ("passed", "lib.tb_example.all"),
+                ("passed", "lib.tb_example_many.test_pass"),
+                ("failed", "lib.tb_example_many.test_fail"),
+            ],
+        )
+
+    def test_vhdl_user_guide_93_example_project(self):
         self.check(
-            str(ROOT / "examples" / "vhdl" / "user_guide" / "run.py"), exit_code=1
+            str(ROOT / "examples" / "vhdl" / "user_guide" / "vhdl1993" / "run.py"),
+            exit_code=1,
         )
         check_report(
             self.report_file,
@@ -185,9 +199,7 @@ class TestExternalRunScripts(unittest.TestCase):
 
     @unittest.skipUnless(simulator_supports_verilog(), "Verilog")
     def test_verilog_user_guide_example_project(self):
-        self.check(
-            str(ROOT / "examples" / "verilog" / "user_guide" / "run.py"), exit_code=1
-        )
+        self.check(str(ROOT / "examples" / "verilog" / "user_guide" / "run.py"), exit_code=1)
         check_report(
             self.report_file,
             [

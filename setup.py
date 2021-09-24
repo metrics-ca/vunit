@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2020, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2021, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 PyPI setup script
@@ -37,9 +37,7 @@ def find_all_files(directory, endings=None):
 DATA_FILES = []
 DATA_FILES += find_all_files("vunit", endings=[".tcl"])
 DATA_FILES += find_all_files(str(Path("vunit") / "vhdl"))
-DATA_FILES += find_all_files(
-    str(Path("vunit") / "verilog"), endings=[".v", ".sv", ".svh"]
-)
+DATA_FILES += find_all_files(str(Path("vunit") / "verilog"), endings=[".v", ".sv", ".svh"])
 DATA_FILES = [os.path.relpath(file_name, "vunit") for file_name in DATA_FILES]
 
 setup(
@@ -70,6 +68,7 @@ setup(
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         "Operating System :: Microsoft :: Windows",
         "Operating System :: MacOS :: MacOS X",
         "Operating System :: POSIX :: Linux",
@@ -79,7 +78,7 @@ setup(
     python_requires=">=3.6",
     install_requires=["colorama"],
     requires=["colorama"],
-    license=["Mozilla Public License 2.0 (MPL 2.0)"],
+    license="Mozilla Public License 2.0 (MPL 2.0)",
     author="Lars Asplund",
     author_email="lars.anders.asplund@gmail.com",
     description="VUnit is an open source unit testing framework for VHDL/SystemVerilog.",

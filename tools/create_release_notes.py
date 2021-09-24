@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2020, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2021, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 Create monolithic release notes file from several input files
@@ -22,9 +22,7 @@ def get_releases(source_path: Path):
     """
     release_notes = source_path / "release_notes"
     releases = []
-    for idx, file_name in enumerate(
-        sorted(glob(str(release_notes / "*.rst")), reverse=True)
-    ):
+    for idx, file_name in enumerate(sorted(glob(str(release_notes / "*.rst")), reverse=True)):
         releases.append(Release(file_name, is_latest=idx == 0))
     return releases
 
@@ -72,10 +70,7 @@ Release notes
             fptr.write(title + "\n")
             fptr.write("-" * len(title) + "\n\n")
 
-            fptr.write(
-                "\n`Download from PyPI <https://pypi.python.org/pypi/vunit_hdl/%s/>`__"
-                % release.name
-            )
+            fptr.write("\n`Download from PyPI <https://pypi.python.org/pypi/vunit_hdl/%s/>`__" % release.name)
 
             if not is_last:
                 fptr.write(
@@ -110,7 +105,7 @@ class Release(object):
             else:
                 raise
 
-        with open(file_name, "r") as fptr:
+        with Path(file_name).open("r", encoding="utf-8") as fptr:
             self.notes = fptr.read()
 
 

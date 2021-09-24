@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2020, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2021, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 Composite generics
@@ -28,18 +28,12 @@ TEST = TB_LIB.test_bench("tb_composite_generics").test("Test 1")
 
 TEST.add_config(
     name="VGA",
-    generics=dict(
-        encoded_tb_cfg=encode(
-            dict(image_width=640, image_height=480, dump_debug_data=False)
-        )
-    ),
+    generics=dict(encoded_tb_cfg=encode(dict(image_width=640, image_height=480, dump_debug_data=False))),
 )
 
 TEST.add_config(
     name="tiny",
-    generics=dict(
-        encoded_tb_cfg=encode(dict(image_width=4, image_height=3, dump_debug_data=True))
-    ),
+    generics=dict(encoded_tb_cfg=encode(dict(image_width=4, image_height=3, dump_debug_data=True))),
 )
 
 VU.main()

@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2020, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2021, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 UI common functions
@@ -66,7 +66,7 @@ def get_checked_file_names_from_globs(pattern, allow_empty):
 
     file_names: List[str] = []
     for pattern_instance in patterns:
-        new_file_names = glob(str(pattern_instance))
+        new_file_names = glob(str(pattern_instance), recursive=True)
         check_not_empty(
             new_file_names,
             allow_empty,

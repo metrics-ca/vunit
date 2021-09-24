@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2020, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2021, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 Check that the Python version used is supported by VUnit
@@ -19,7 +19,7 @@ def version_is_ok():
     Returns true if version is high enough
     """
     version = (sys.version_info[0], sys.version_info[1])
-    return version >= (3, 6)
+    return version >= (MAJOR, MINOR)
 
 
 if not version_is_ok():
