@@ -89,14 +89,6 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         self._libraries = []
         self._log_level = log_level
 
-    @classmethod
-    def find_prefix_from_path(cls):
-        """
-        Find first valid dsim toolchain prefix
-        """
-        return cls.find_toolchain([cls.executable])
-    
-  
     def setup_library_mapping(self, project):
         """
         Setup library mapping
@@ -164,13 +156,15 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
 
         cmd = str(Path(self._prefix) / "dsim")
         args = []
-        args += ["-exit-on-error 2"]
+        args += ["-exit-on-error 1"]
         args += config.sim_options.get("metrics.dsim_sim_flags", [])
         args += ['-l %s' % str(Path(script_path) / ("dsim_simulate.log"))]
             
         runner_cfg = config.generics["runner_cfg"]
-        print('runner_cfg = ' + runner_cfg)
-        args += ['-defparam runner_cfg=\"%s\"' % runner_cfg]
+
+        for name, value in config.generics.items():
+            args += ['-defparam %s=\"%s\"' % (name, value)]
+
         for library in self._libraries:
             args += ['-L %s' % library.name]
 
