@@ -110,11 +110,30 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         raise CompileError
 
 
-    #def compile_vhdl_file_command(self, source_file):
+    def compile_vhdl_file_command(self, source_file):
         """
         Returns command to compile a VHDL file
         """
-    # VHDL not currently supported by Metrics
+        cmd = str(Path(self._prefix) / "dvhcom")
+        args = []
+        args += ["-work", source_file.library.directory.rstrip(source_file.library.name)]
+        args += ["-lib", source_file.library.name]
+        args += source_file.compile_options.get("metrics.dsim_vhdl_flags", [])
+        args += [
+            '-l %s'
+            % str(
+                Path(self._output_path)
+                / ("metrics_compile_vhdl_file_%s.log" % source_file.library.name)
+            )
+        ]
+
+        args += ['%s' % source_file.name]
+        argsfile = str(
+            Path(self._output_path)
+            / ("metrics_compile_vhdl_file_%s.args" % source_file.library.name)
+        )
+        write_file(argsfile, "\n".join(args))
+        return [cmd, "-f", argsfile]
    
 
     def compile_verilog_file_command(self, source_file):
