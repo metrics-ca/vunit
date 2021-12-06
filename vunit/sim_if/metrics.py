@@ -15,7 +15,7 @@ import os
 import subprocess
 import logging
 from ..exceptions import CompileError
-from ..ostools import write_file, file_exists
+from ..ostools import Process, write_file, file_exists
 from ..vhdl_standard import VHDL
 from . import SimulatorInterface, run_command, ListOfStringOption
 
@@ -79,7 +79,7 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         """
         Returns True when this simulator supports VHDL 2008 contexts
         """
-        return False
+        return True
 
     def __init__(  # pylint: disable=too-many-arguments
         self, prefix, output_path, gui=False, log_level=None
@@ -89,14 +89,72 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         self._libraries = []
         self._log_level = log_level
 
+    @staticmethod
+    def _vhdl_std_to_ieee_lib(vhdl_standard):
+        """
+        Based on the VHDL standard in use, decide which IEEE library to use
+        """
+        if vhdl_standard == VHDL.STD_2002:
+            return "ieee93"
+
+        if vhdl_standard == VHDL.STD_2008:
+            return "ieee08"
+
+        if vhdl_standard == VHDL.STD_1993:
+            return "ieee93"
+
+        raise ValueError("Invalid VHDL standard %s" % vhdl_standard)
+    
+
     def setup_library_mapping(self, project):
         """
         Setup library mapping
         """
+        #mapped_libraries = self._get_mapped_libraries()
+        mapped_libraries = {}
         for library in project.get_libraries():
             self._libraries.append(library)
+            #self.create_library(library.name, library.directory, mapped_libraries)
+            print(library.name + " " + library.vhdl_standard._standard)
 
-            
+        # Determine which ieee library to map, based on the VHDL standard in use
+        libToMap = self._vhdl_std_to_ieee_lib(self._libraries[0].vhdl_standard) 
+        proc = subprocess.run([str(Path(self._prefix) / "dlib"), "map", "-work", self._libraries[0].directory.rstrip("vunit_lib"), "-lib", "ieee", os.getenv("STD_LIBS")+"/"+libToMap+"/sfe/ieee"], capture_output=True, text=True)
+        print(proc)
+
+    #def _get_mapped_libraries(self):
+        """
+        Get mapped libraries from modelsim.ini file
+        """
+    #    cfg = parse_modelsimini(self._sim_cfg_file_name)
+    #    libraries = dict(cfg.items("Library"))
+    #    if "others" in libraries:
+    #        del libraries["others"]
+    #    return libraries
+
+    #def create_library(self, library_name, path, mapped_libraries=None):
+        """
+        Create and map a library_name to path
+        """
+    #    mapped_libraries = mapped_libraries if mapped_libraries is not None else {}
+
+        #apath = str(Path(path).parent.resolve())
+        #print("apath = " + apath)
+        #print("path= " + path)
+        #if not file_exists(apath):
+        #    os.makedirs(apath)
+
+        #if not file_exists(path):
+        #    proc = Process([str(Path(self._prefix) / "vlib"), "-unix", path], env=self.get_env())
+        #    proc.consume_output(callback=None)
+
+        #if library_name in mapped_libraries and mapped_libraries[library_name] == path:
+        #    return
+
+        #cfg = parse_modelsimini(self._sim_cfg_file_name)
+        #cfg.set("Library", library_name, path)
+        #write_modelsimini(cfg, self._sim_cfg_file_name)
+
     def compile_source_file_command(self, source_file):
         """
         Returns the command to compile a single source file
@@ -109,6 +167,21 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
 
         raise CompileError
 
+    @staticmethod
+    def _vhdl_std_opt(vhdl_standard):
+        """
+        Convert standard to a DSim command line flag
+        """
+        if vhdl_standard == VHDL.STD_2002:
+            return "-vhdl2002"
+
+        if vhdl_standard == VHDL.STD_2008:
+            return "-vhdl2008"
+
+        if vhdl_standard == VHDL.STD_1993:
+            return "-vhdl93"
+
+        raise ValueError("Invalid VHDL standard %s" % vhdl_standard)
 
     def compile_vhdl_file_command(self, source_file):
         """
@@ -118,7 +191,10 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         args = []
         args += ["-work", source_file.library.directory.rstrip(source_file.library.name)]
         args += ["-lib", source_file.library.name]
+        args += ["%s" % self._vhdl_std_opt(source_file.get_vhdl_standard())]
         args += source_file.compile_options.get("metrics.dsim_vhdl_flags", [])
+        print(source_file.compile_options.get("metrics.dsim_vhdl_flags", []))
+        
         args += [
             '-l %s'
             % str(
