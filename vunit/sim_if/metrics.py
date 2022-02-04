@@ -110,50 +110,28 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         """
         Setup library mapping
         """
-        #mapped_libraries = self._get_mapped_libraries()
-        mapped_libraries = {}
         for library in project.get_libraries():
             self._libraries.append(library)
-            #self.create_library(library.name, library.directory, mapped_libraries)
-            print(library.name + " " + library.vhdl_standard._standard)
+        #    print(library.name + " " + library.vhdl_standard._standard)
+        vhdl_standards = set(
+            source_file.get_vhdl_standard()
+            for source_file in project.get_source_files_in_order()
+            if source_file.is_vhdl
+        )
 
+        if not vhdl_standards:
+            self._vhdl_standard = VHDL.STD_2008
+        #elif len(vhdl_standards) != 1:
+        #    raise RuntimeError("GHDL cannot handle mixed VHDL standards, found %r" % list(vhdl_standards))
+        else:
+            self._vhdl_standard = list(vhdl_standards)[0]
+        
         # Determine which ieee library to map, based on the VHDL standard in use
-        libToMap = self._vhdl_std_to_ieee_lib(self._libraries[0].vhdl_standard) 
+        #libToMap = self._vhdl_std_to_ieee_lib(self._libraries[0].vhdl_standard) 
+        libToMap = self._vhdl_std_to_ieee_lib(self._vhdl_standard) 
         proc = subprocess.run([str(Path(self._prefix) / "dlib"), "map", "-work", self._libraries[0].directory.rstrip("vunit_lib"), "-lib", "ieee", os.getenv("STD_LIBS")+"/"+libToMap+"/sfe/ieee"], capture_output=True, text=True)
-        print(proc)
+        print(proc) 
 
-    #def _get_mapped_libraries(self):
-        """
-        Get mapped libraries from modelsim.ini file
-        """
-    #    cfg = parse_modelsimini(self._sim_cfg_file_name)
-    #    libraries = dict(cfg.items("Library"))
-    #    if "others" in libraries:
-    #        del libraries["others"]
-    #    return libraries
-
-    #def create_library(self, library_name, path, mapped_libraries=None):
-        """
-        Create and map a library_name to path
-        """
-    #    mapped_libraries = mapped_libraries if mapped_libraries is not None else {}
-
-        #apath = str(Path(path).parent.resolve())
-        #print("apath = " + apath)
-        #print("path= " + path)
-        #if not file_exists(apath):
-        #    os.makedirs(apath)
-
-        #if not file_exists(path):
-        #    proc = Process([str(Path(self._prefix) / "vlib"), "-unix", path], env=self.get_env())
-        #    proc.consume_output(callback=None)
-
-        #if library_name in mapped_libraries and mapped_libraries[library_name] == path:
-        #    return
-
-        #cfg = parse_modelsimini(self._sim_cfg_file_name)
-        #cfg.set("Library", library_name, path)
-        #write_modelsimini(cfg, self._sim_cfg_file_name)
 
     def compile_source_file_command(self, source_file):
         """
