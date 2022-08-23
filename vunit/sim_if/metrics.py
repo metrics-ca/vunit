@@ -240,8 +240,6 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
                 args += ['-defparam %s=\"%s\"' % (name, value)]
             else:
                 args += ['-defparam %s=%s' % (name, value)]
-         for library in self._libraries:
-             args += ['-defparam %s=\"%s\"' % (name, value)]
 
         for library in self._libraries:
             args += ['-L %s' % library.name]
