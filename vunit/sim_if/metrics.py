@@ -236,7 +236,12 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         runner_cfg = config.generics["runner_cfg"]
 
         for name, value in config.generics.items():
-            args += ['-defparam %s=\"%s\"' % (name, value)]
+            if isinstance(value, str):
+                args += ['-defparam %s=\"%s\"' % (name, value)]
+            else:
+                args += ['-defparam %s=%s' % (name, value)]
+         for library in self._libraries:
+             args += ['-defparam %s=\"%s\"' % (name, value)]
 
         for library in self._libraries:
             args += ['-L %s' % library.name]
