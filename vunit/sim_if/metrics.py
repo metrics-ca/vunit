@@ -9,6 +9,7 @@ Interface for the Metrics DSim simulator
 """
 
 from pathlib import Path
+from pathlib import PurePath
 from os.path import relpath
 from os import environ
 import os
@@ -219,6 +220,19 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         write_file(argsfile, "\n".join(args))
         return [cmd, "-f", argsfile]
 
+    @staticmethod
+    def _escape_nested_quotes(value):
+        """
+        Returns copy of string with a separate escape character before
+        any nested quotes
+        """
+        val_copy = ""
+        for i in range(len(value)):
+            if (value[i] == '"' and (i == 0 or value[i-1] != "\\")):
+                val_copy += "\\"
+            val_copy += value[i]
+        return val_copy
+
     def simulate(  # pylint: disable=too-many-locals
             self, output_path, test_suite_name, config, elaborate_only=False):
         """
@@ -236,7 +250,10 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         runner_cfg = config.generics["runner_cfg"]
 
         for name, value in config.generics.items():
+            if isinstance(value, PurePath):
+                value = str(value)
             if isinstance(value, str):
+                value = self._escape_nested_quotes(value)
                 args += ['-defparam %s=\"%s\"' % (name, value)]
             else:
                 args += ['-defparam %s=%s' % (name, value)]
