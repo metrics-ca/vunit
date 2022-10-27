@@ -38,6 +38,13 @@ from metrics.basics import *
 sys.path.append("./metrics_lib")
 from monitor import *
 
+#######
+##   set the dsim options
+if "DSIM_CMD_OPTIONS" in envVars:
+    os.environ['DSIM_CMD_OPTIONS'] = envVars.get("DSIM_CMD_OPTIONS") + " -timescale 1ns/1ps"
+else:
+    os.environ['DSIM_CMD_OPTIONS'] = " -timescale 1ns/1ps"
+
 ###################################
 # Builds the sub-script's command for VHDL remote run
 class commandRemoteVUNIT:
@@ -50,6 +57,7 @@ class commandRemoteVUNIT:
         self.monitorCmd = "mux-status "
         self.time = 0
         self.indx = numb
+
 
 #######################################################
 ##                   main
