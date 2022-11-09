@@ -1,29 +1,34 @@
 #!/usr/bin/env python3
 
-#  **********************************************************************
-#  **********************************************************************
-#  *********  Copyright (c) 2017-2022 Metrics Technologies Inc, *********
-#  *********  All rights reserved.                              *********
-#  *********                                                    *********
-#  *********  Use, disclosure, or distribution is prohibited    *********
-#  *********  without prior written permission.                 *********
-#  **********************************************************************
-#  **********************************************************************
+#  ***************************************************************************
+#  ***************************************************************************
+#  *********  Copyright (c) 2017-2022 Metrics Design Automation Inc, *********
+#  *********  All rights reserved.                                   *********
+#  *********                                                         *********
+#  *********  The following source code contains confidential and    *********
+#  *********  proprietary information of, and is solely owned by,    *********
+#  *********  Metrics Design Automation Inc.                         *********
+#  *********                                                         *********
+#  *********  Use, copy, disclosure, or distribution is prohibited   *********
+#  *********  without prior written permission.                      *********
+#  ***************************************************************************
 
 # -*- coding: utf-8 -*-
 #import logging
 #logger = logging.getLogger(__name__)
 
 
-#import random
-#from random import Random
-import string
+
 import sys
+import getopt
 import os
-from os.path import exists
+import subprocess
 import shutil
-from shutil import copyfile
-import glob
+import time
+import traceback
+from pathlib import Path
+import string
+from os.path import exists
 
 envVars = os.environ
 if "PYTHONPATH" not in envVars:
@@ -35,8 +40,94 @@ if "PYTHONPATH" not in envVars:
     
 from metrics.basics import *
 
-sys.path.append("./metrics_lib")
-from monitor import *
+
+# Constants
+VERSION = "1.0.0"
+SUCCESS = 0
+
+
+# Globals set during argument processing
+debug = False
+useColor = False
+verbose = False
+
+###################################
+# Prints a usage line with the set of possible options
+def print_usage(retVal):
+    print("usage: {}".format(os.path.basename(sys.argv[0])), end=" ")
+    print("{--help}", end=" ")
+    print("{--version}", end=" ")
+    print("{--verbose}", end=" ")
+    print("{--color}", end=" ")
+    print("")
+    do_exit(retVal, debug)
+
+###################################
+# Help output
+def print_help():
+    myexe = os.path.basename(sys.argv[0])
+
+    print_color("NAME", False, Bold, White, BG_Black)
+    print("    {}".format(myexe))
+    print_color("\nSYNOPSIS", False, Bold, White, BG_Black)
+    print("    {} [OPTIONS]".format(myexe))
+    print_color("\nDESCRIPTION", False, Bold, White, BG_Black)
+    print("    PUT DESCRIPTION HERE")
+    print_color("\nOPTIONS", False, Bold, White, BG_Black)
+    print("    -h, --help")
+    print("        Display's this help information")
+    print("    -v, --version")
+    print("        Print out the version of this tool")
+    print("    -V, --verbose")
+    print("        Print out each test as it is executed")
+    print("    -C, --color")
+    print("        Enable color output")
+    print_color("\nCOPYRIGHT", False, Bold, White, BG_Black)
+    copyright = get_copyright()
+    print("    {}".format(copyright))
+
+
+###################################
+# Checks to see if the user accidentally had the same arg on the command line twice
+# or had two or more incompatible arguments on the command line
+def check_for_dup_arg(comp):
+    if comp:
+        print_usage(-1)
+    return True
+
+###################################
+# Process command line arguments
+def process_args():
+    global debug
+    global verbose
+    global useColor
+
+    try:
+        opts, testDirs = getopt.getopt(sys.argv[1:], "hicCvVrdI",
+                                                     ["help",
+                                                      "color",
+                                                      "version",
+                                                      "verbose",
+                                                      "debug"])
+    except getopt.GetoptError as err:
+        print_err(str(err))
+        print_usage(-2)
+
+    for o, a in opts:
+        if o in ("-h", "--help"):
+            print_help()
+            do_exit(SUCCESS, debug)
+        if o in ("-v", "--version"):
+            print_key_info("Version: {}".format(VERSION),"",False)
+            do_exit(SUCCESS, debug)
+        elif o in ("-V", "--verbose"):
+            verbose = check_for_dup_arg(verbose)
+        elif o in ("-d", "--debug"):
+            debug = check_for_dup_arg(debug)
+        elif o in ("-C", "--color"):
+            useColor = check_for_dup_arg(useColor)
+
+    set_color_usage(useColor)
 
 #######################################################
 ##                   main
@@ -50,11 +141,12 @@ def main(argv):
          output into the vunit_check.output file.
     
     """
-    ##  only flag  so is hard coded.
-    verbose = 0
-    if len(argv) > 0 and argv[0] == "-v":
-        verbose = 1
-        #print("Verbose")
+
+    programStatus = False
+    set_color_usage(sys.stdout.isatty())
+
+    process_args()
+
     # setup some default strings
     MapFile = "test_name_to_path_mapping.txt"
     OutPath = "test_output/"
@@ -62,7 +154,11 @@ def main(argv):
     PassMSG = "=N:[VhdlStop]"
     
     # Open checker output log file.
-    lh = open ("vunit_check.log", "w")
+    try:
+        lh = open ("vunit_check.log", "w")
+    except:
+        print_err("Could not open output file {}".format(os.path.join(os.getcwd(),"vunit_check.log")))
+        do_exit(-1)
         
     #  now open the test listed to be run
     if exists("tests_to_run.txt"):
@@ -70,11 +166,12 @@ def main(argv):
         rlst = fh.readlines()
         fh.close()
     else:
-        print("No tests list file was found under 'tests_to_run.txt'\n")
-        print("All tests found are listed in file 'test_found_list.txt'\n")
-        return 1
+        print_err("No tests list file was found in 'tests_to_run.txt'")
+        print_err("All tests found are listed in file 'test_found_list.txt'")
+        do_exit(-1)
     
     ##  go through the tests 
+    passed = 0
     failures = 0
     missing = 0
     for t in rlst:
@@ -82,61 +179,55 @@ def main(argv):
             continue
         t = t.strip()
         
-        out_dir = "./" + t + "/vunit_out/"
+        out_dir = os.path.join(".", t, "vunit_out")
         if not exists(out_dir):
             missing += 1
             lh.write(">>>>  ERROR: Expected output directory was not found\n    " + out_dir)
             lh.write("\n")
             lh.write("***************************************************************************\n")
-            print("Expected output: " + out_dir + " Was not found\n")
+            print_err("Expected output: " + out_dir + " Was not found")
             continue
         
         #  map file  Map tests to  random naming
-        mfile = out_dir + OutPath + MapFile
+        mfile = os.path.join(out_dir, OutPath, MapFile)
         #  if now mapping file  continue
         if not exists(mfile):
-            print("No Name Mapping File found in " + mfile)
+            print_err("No Name Mapping File found in " + mfile)
             continue
         
         # all seems good,  check the files for passing message.
-        mf = open(mfile , "r")
+        try:
+            mf = open(mfile , "r")
+        except:
+            print_err("Could not open '{}' for read".format(mfile))
+            continue
         mlst = mf.readlines()
         for m in mlst:
             sm = m.split()
             
-            dtn = out_dir + OutPath + sm[0] + "/" + OFile
+            dtn = os.path.join(out_dir, OutPath, sm[0], OFile)
             
-            with open(dtn, "r") as file:
-                txt = file.read()
-                if not PassMSG in txt:
-                    lh.write(">>>>  Test Failed: " + m + "\n")
-                    if verbose:
-                        lh.write(txt)
-                        lh.write("\n")
-                        lh.write("***************************************************************************\n")
-                    
-                    failures += 1
-    
-    print("Failures: " + str(failures) + "\nMissing: " + str(missing))
+            try:
+                with open(dtn, "r") as file:
+                    txt = file.read()
+                    if not PassMSG in txt:
+                        lh.write(">>>>  Test Failed: " + m + "\n")
+                        if verbose:
+                            lh.write(txt)
+                            lh.write("\n")
+                            lh.write("***************************************************************************\n")
+                        
+                        failures += 1
+                    else:
+                        passed += 1
+            except:
+                print_err("Could not open '{}' for read".format(dtn))
+                continue
+        
+    print("Passed: " + str(passed) + "\nFailures: " + str(failures) + "\nMissing: " + str(missing))
     return (failures, missing)
     
 if __name__ == '__main__':
     stat = main(sys.argv[1:])
     do_exit(stat)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
