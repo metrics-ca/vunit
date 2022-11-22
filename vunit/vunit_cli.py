@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2021, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2022, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 .. _custom_cli:
@@ -71,7 +71,7 @@ def _create_argument_parser(description=None, for_documentation=False):
     :returns: The created :mod:`argparse` parser object
     """
     if description is None:
-        description = "VUnit command line tool version %s" % version()
+        description = f"VUnit command line tool version {version()!s}"
 
     if for_documentation:
         default_output_path = "./vunit_out"
@@ -149,7 +149,15 @@ def _create_argument_parser(description=None, for_documentation=False):
         help="Only elaborate test benches without running",
     )
 
-    parser.add_argument("--clean", action="store_true", default=False, help="Remove output path first")
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        default=False,
+        help="Remove output path first. "
+        "This is useful, for example, to force a complete "
+        "recompile when compilation artifacts are obsolete "
+        "due to a simulator version update.",
+    )
 
     parser.add_argument(
         "-o",
@@ -250,7 +258,7 @@ def positive_int(val):
         assert ival > 0
         return ival
     except (ValueError, AssertionError) as exv:
-        raise argparse.ArgumentTypeError("'%s' is not a valid positive int" % val) from exv
+        raise argparse.ArgumentTypeError(f"'{val!s}' is not a valid positive int") from exv
 
 
 def _parser_for_documentation():

@@ -133,7 +133,6 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         proc = subprocess.run([str(Path(self._prefix) / "dlib"), "map", "-work", self._libraries[0].directory.rstrip("vunit_lib"), "-lib", "ieee", os.getenv("STD_LIBS")+"/"+libToMap+"/sfe/ieee"], capture_output=True, text=True)
         print(proc) 
 
-
     def compile_source_file_command(self, source_file):
         """
         Returns the command to compile a single source file

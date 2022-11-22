@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2021, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2022, Lars Asplund lars.anders.asplund@gmail.com
 
 # pylint: disable=unused-wildcard-import
 # pylint: disable=wildcard-import
@@ -94,7 +94,7 @@ class VerilogParser(object):
         """
         Returns the database key for parse results of file_name
         """
-        return ("CachedVerilogParser.parse(%s)" % str(Path(file_name).resolve)).encode()
+        return f"CachedVerilogParser.parse({str(Path(file_name).resolve)})".encode()
 
     def _store_result(self, file_name, result, included_files, defines):
         """
