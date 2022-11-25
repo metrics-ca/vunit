@@ -11,7 +11,7 @@ Interface for the Metrics DSim simulator
 from pathlib import Path
 from pathlib import PurePath
 from os.path import relpath
-from os import environ
+from os import environ, makedirs
 import os
 import subprocess
 import logging
@@ -19,6 +19,8 @@ from ..exceptions import CompileError
 from ..ostools import Process, write_file, file_exists
 from ..vhdl_standard import VHDL
 from . import SimulatorInterface, run_command, ListOfStringOption
+
+import time
 
 LOGGER = logging.getLogger(__name__)
 
@@ -47,7 +49,7 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         Add command line arguments
         """
         group = parser.add_argument_group(
-            "Metrics dsim", description="Metrics dsim-specific flags"
+            "Metrics DSim", description="Metrics DSim-specific flags"
         )
         group.add_argument(
             "-waves",
@@ -73,6 +75,9 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         """
         Find Metrics simulator from PATH environment variable
         """
+        mdc_prefix = cls.find_toolchain(["mdc"])
+        if (mdc_prefix):
+           return mdc_prefix
         return cls.find_toolchain(["dsim"])
 
     @staticmethod
@@ -89,6 +94,11 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         self._prefix = prefix
         self._libraries = []
         self._log_level = log_level
+        in_cloud = self.find_toolchain(["mdc"])
+        if (in_cloud):
+            self._in_cloud = True
+        else:
+            self._in_cloud = False
 
     @staticmethod
     def _vhdl_std_to_ieee_lib(vhdl_standard):
@@ -105,7 +115,27 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
             return "ieee93"
 
         raise ValueError("Invalid VHDL standard %s" % vhdl_standard)
-    
+
+    def _rel_path(self, path):
+        return os.path.relpath(path, os.getcwd())
+
+
+    def _format_cmd(self, cmd, args):
+        metrics_cloud = True
+        if self._in_cloud:
+            rvalue = ['mdc', cmd, '-a', '{}'.format(' '.join(args))];
+            print("MCA rvalue from _exec_cmds = \n")
+            print(rvalue);
+            print("\nOtherwise:\n")
+            rvalue = [cmd, '{}'.format(' '.join(args))]
+            print(rvalue)
+            return ['mdc', cmd, '-a', '{}'.format(' '.join(args))]
+        else:
+            rvalue = [cmd] + args;
+            print("MCA _format_cmd for on-prem is:")
+            print(rvalue)
+            return rvalue
+            #return [cmd, '{}'.format(' '.join(args))]
 
     def setup_library_mapping(self, project):
         """
@@ -126,17 +156,28 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         #    raise RuntimeError("GHDL cannot handle mixed VHDL standards, found %r" % list(vhdl_standards))
         else:
             self._vhdl_standard = list(vhdl_standards)[0]
-        
+
         # Determine which ieee library to map, based on the VHDL standard in use
-        #libToMap = self._vhdl_std_to_ieee_lib(self._libraries[0].vhdl_standard) 
-        libToMap = self._vhdl_std_to_ieee_lib(self._vhdl_standard) 
-        proc = subprocess.run([str(Path(self._prefix) / "dlib"), "map", "-work", self._libraries[0].directory.rstrip("vunit_lib"), "-lib", "ieee", os.getenv("STD_LIBS")+"/"+libToMap+"/sfe/ieee"], capture_output=True, text=True)
-        print(proc) 
+        #libToMap = self._vhdl_std_to_ieee_lib(self._libraries[0].vhdl_standard)
+        libToMap = self._vhdl_std_to_ieee_lib(self._vhdl_standard)
+        work = self._rel_path(self._libraries[0].directory.rstrip('vunit_lib'))
+        args = ['map', '-work', work, "-lib", "ieee"]
+        if self._in_cloud:
+            args += [os.path.join('%STD_LIBS%', libToMap, 'sfe/ieee')]
+        else:
+            args += [os.getenv("STD_LIBS")+"/"+libToMap+"/sfe/ieee"]
+        cmd = self._format_cmd('dlib', args)
+        print("DLIB", cmd)
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        print(proc)
+
 
     def compile_source_file_command(self, source_file):
         """
         Returns the command to compile a single source file
         """
+        #print("..... waiting 3 s (really).....\n")
+        #time.sleep(3)
         if source_file.is_vhdl:
             return self.compile_vhdl_file_command(source_file)
 
@@ -165,30 +206,25 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         """
         Returns command to compile a VHDL file
         """
-        cmd = str(Path(self._prefix) / "dvhcom")
         args = []
-        args += ["-work", source_file.library.directory.rstrip(source_file.library.name)]
+        args +=  ["-work", self._rel_path(source_file.library.directory.rstrip(source_file.library.name))]
         args += ["-lib", source_file.library.name]
         args += ["%s" % self._vhdl_std_opt(source_file.get_vhdl_standard())]
         args += source_file.compile_options.get("metrics.dsim_vhdl_flags", [])
         print(source_file.compile_options.get("metrics.dsim_vhdl_flags", []))
-        
+
+        output_path = self._rel_path(self._output_path)
+
         args += [
-            '-l %s'
-            % str(
-                Path(self._output_path)
-                / ("metrics_compile_vhdl_file_%s.log" % source_file.library.name)
-            )
+            '-l', '%s'
+            % os.path.join(output_path,
+                           ("metrics_compile_vhdl_file_%s.log" % source_file.library.name))
         ]
 
-        args += ['%s' % source_file.name]
-        argsfile = str(
-            Path(self._output_path)
-            / ("metrics_compile_vhdl_file_%s.args" % source_file.library.name)
-        )
-        write_file(argsfile, "\n".join(args))
-        return [cmd, "-f", argsfile]
-   
+        args += ['%s' % self._rel_path(source_file.name)]
+        cmd = self._format_cmd('dvhcom', args)
+        print("DVHCOM", cmd)
+        return cmd
 
     def compile_verilog_file_command(self, source_file):
         """
@@ -210,7 +246,6 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         for include_dir in source_file.include_dirs:
             args += ['+incdir+%s' % include_dir]
 
-        
         args += ['%s' % source_file.name]
         argsfile = str(
             Path(self._output_path)
@@ -237,14 +272,18 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         """
         Elaborates and Simulates
         """
-
         script_path = str(Path(output_path) / self.name)
+        makedirs(script_path)
 
-        cmd = str(Path(self._prefix) / "dsim")
+        cmd = []
+        if self._in_cloud:
+            cmd = ["mdc", "dsim", "-a"]
+        else:
+            cmd = [str(Path(self._prefix) / "dsim")]
         args = []
         args += ["-exit-on-error 1"]
         args += config.sim_options.get("metrics.dsim_sim_flags", [])
-        args += ['-l %s' % str(Path(script_path) / ("dsim_simulate.log"))]
+        args += ['-l dsim_simulate.log']
             
         runner_cfg = config.generics["runner_cfg"]
 
@@ -260,17 +299,20 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         for library in self._libraries:
             args += ['-L %s' % library.name]
 
-        args += ['-work %s' % library.directory.rstrip(library.name)]
+        work_path = os.path.relpath(library.directory.rstrip(library.name), script_path)
+        args += ['-work %s' % work_path]
         args += ["+acc+b"]
         args += ["-top %s.%s" % (config.library_name, config.entity_name)]
             
         argsfile = "%s/dsim_simulate.args" % (script_path)
         write_file(argsfile, "\n".join(args))
+        argsfile = relpath(argsfile, script_path)
+        cmd += ['-F', '%s' % argsfile]
+        print("DSIM cmd: ", cmd)
         if not run_command(
-            [cmd, "-f", relpath(argsfile, script_path)],
-            cwd=script_path,
-            env=self.get_env(),
+                cmd,
+                cwd=script_path,
+                env=self.get_env(),
         ):
             return False
         return True
-
