@@ -126,16 +126,12 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
             rvalue = ['mdc', cmd, '-a', '{}'.format(' '.join(args))];
             print("MCA rvalue from _exec_cmds = \n")
             print(rvalue);
-            print("\nOtherwise:\n")
-            rvalue = [cmd, '{}'.format(' '.join(args))]
-            print(rvalue)
             return ['mdc', cmd, '-a', '{}'.format(' '.join(args))]
         else:
             rvalue = [cmd] + args;
             print("MCA _format_cmd for on-prem is:")
             print(rvalue)
             return rvalue
-            #return [cmd, '{}'.format(' '.join(args))]
 
     def setup_library_mapping(self, project):
         """
@@ -176,8 +172,6 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         """
         Returns the command to compile a single source file
         """
-        #print("..... waiting 3 s (really).....\n")
-        #time.sleep(3)
         if source_file.is_vhdl:
             return self.compile_vhdl_file_command(source_file)
 
@@ -211,8 +205,8 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         args += ["-lib", source_file.library.name]
         args += ["%s" % self._vhdl_std_opt(source_file.get_vhdl_standard())]
         args += source_file.compile_options.get("metrics.dsim_vhdl_flags", [])
-        print(source_file.compile_options.get("metrics.dsim_vhdl_flags", []))
 
+        # Assume everything relative to the current directory
         output_path = self._rel_path(self._output_path)
 
         args += [
@@ -275,11 +269,6 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         script_path = str(Path(output_path) / self.name)
         makedirs(script_path)
 
-        cmd = []
-        if self._in_cloud:
-            cmd = ["mdc", "dsim", "-a"]
-        else:
-            cmd = [str(Path(self._prefix) / "dsim")]
         args = []
         args += ["-exit-on-error 1"]
         args += config.sim_options.get("metrics.dsim_sim_flags", [])
@@ -307,7 +296,8 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         argsfile = "%s/dsim_simulate.args" % (script_path)
         write_file(argsfile, "\n".join(args))
         argsfile = relpath(argsfile, script_path)
-        cmd += ['-F', '%s' % argsfile]
+
+        cmd = self._format_cmd("dsim", ['-F', '%s' % argsfile])
         print("DSIM cmd: ", cmd)
         if not run_command(
                 cmd,
