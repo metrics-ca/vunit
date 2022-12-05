@@ -132,6 +132,28 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
             rvalue = [cmd] + args
             return rvalue
 
+    def _encode_for_runner_cfg_match(self, the_string):
+        the_string = encode_test_case(the_string)
+        the_string = the_string.replace("\\", "/")
+        return the_string
+
+    def _download_cloud_file(self, file_name, relative_output_path):
+        """
+        Replaces (or creates new) local copy of file with one downloaded from cloud.
+        """
+        cmd = ['mdc', 'download', file_name]
+        if not run_command(
+                cmd,
+                cwd=relative_output_path,
+                env=self.get_env()):
+            return False
+        downloaded_results = os.path.join(relative_output_path, "_downloaded_" + file_name)
+        local_results = os.path.join(relative_output_path, file_name)
+        if os.path.exists(local_results):
+            os.remove(local_results)
+        os.rename(downloaded_results, local_results)
+        return True
+
     def setup_library_mapping(self, project):
         """
         Setup library mapping
@@ -228,7 +250,6 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
                                 self._get_work_dir_name())
         output_path = self._rel_path(self._output_path)
 
-        cmd = str(Path(self._prefix) / "dvlcom")
         args = []
         args += ["-work", work_dir]
         args += ["-lib", source_file.library.name]
@@ -242,15 +263,18 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         ]
 
         for include_dir in source_file.include_dirs:
-            args += ['+incdir+%s' % include_dir]
+            relative_include_dir = self._rel_path(include_dir)
+            args += ['+incdir+%s' % relative_include_dir]
 
-        args += ['%s' % source_file.name]
+        args += ['%s' % self._rel_path(source_file.name)]
         argsfile = str(
             Path(output_path)
             / ("metrics_compile_verilog_file_%s.args" % source_file.library.name)
         )
         write_file(argsfile, "\n".join(args))
-        return [cmd, "-f", argsfile]
+        cmd = self._format_cmd("dvlcom", ['-f', '%s' % argsfile])
+        # print("DVLCOM", cmd)
+        return cmd
 
     @staticmethod
     def _escape_nested_quotes(value):
@@ -265,22 +289,6 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
             val_copy += value[i]
         return val_copy
 
-    def _download_cloud_file(file_name, relative_output_path):
-        """
-        Replaces (or creates new) local copy of file with one downloaded from cloud.
-        """
-        cmd = ['mdc', 'download', file_name]
-        if not run_command(
-                cmd,
-                cwd=relative_output_path,
-                env=self.get_env()):
-            return False
-        downloaded_results = os.path.join(relative_output_path, "_downloaded_" + file_name)
-        local_results = os.path.join(relative_output_path, file_name)
-        if os.path.exists(local_results):
-            os.remove(local_results)
-        os.rename(downloaded_results, local_results)
-        return True
 
     def simulate(  # pylint: disable=too-many-locals
             self, output_path, test_suite_name, config, elaborate_only=False):
@@ -295,10 +303,10 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         # in the information passed through generics.
         remote_output_path = os.path.relpath(output_path, script_path)
         remote_tb_path = os.path.relpath(config.tb_path, script_path)
-        encoded_output_path = encode_test_case(output_path)
-        encoded_tb_path = encode_test_case(config.tb_path)
-        encoded_remote_output_path = encode_test_case(remote_output_path)
-        encoded_remote_tb_path = encode_test_case(remote_tb_path)
+        encoded_output_path = self._encode_for_runner_cfg_match(output_path)
+        encoded_tb_path = self._encode_for_runner_cfg_match(config.tb_path)
+        encoded_remote_output_path = self._encode_for_runner_cfg_match(remote_output_path)
+        encoded_remote_tb_path = self._encode_for_runner_cfg_match(remote_tb_path)
 
         args = []
         args += ["-exit-on-error 1"]
