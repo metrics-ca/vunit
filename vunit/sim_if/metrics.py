@@ -19,7 +19,8 @@ from ..exceptions import CompileError
 from ..ostools import Process, write_file, file_exists
 from ..vhdl_standard import VHDL
 from . import SimulatorInterface, run_command, ListOfStringOption
-
+from ..test.suites import get_result_file_name
+from ..test.suites import encode_test_case
 import time
 
 LOGGER = logging.getLogger(__name__)
@@ -116,21 +117,19 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
 
         raise ValueError("Invalid VHDL standard %s" % vhdl_standard)
 
+    def _get_work_dir_name(self):
+        return "dsim_work"
+
     def _rel_path(self, path):
         return os.path.relpath(path, os.getcwd())
-
 
     def _format_cmd(self, cmd, args):
         metrics_cloud = True
         if self._in_cloud:
-            rvalue = ['mdc', cmd, '-a', '{}'.format(' '.join(args))];
-            print("MCA rvalue from _exec_cmds = \n")
-            print(rvalue);
-            return ['mdc', cmd, '-a', '{}'.format(' '.join(args))]
+            rvalue = ['mdc', cmd, '-a', '{}'.format(' '.join(args))]
+            return rvalue
         else:
-            rvalue = [cmd] + args;
-            print("MCA _format_cmd for on-prem is:")
-            print(rvalue)
+            rvalue = [cmd] + args
             return rvalue
 
     def setup_library_mapping(self, project):
@@ -139,7 +138,6 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         """
         for library in project.get_libraries():
             self._libraries.append(library)
-        #    print(library.name + " " + library.vhdl_standard._standard)
         vhdl_standards = set(
             source_file.get_vhdl_standard()
             for source_file in project.get_source_files_in_order()
@@ -148,24 +146,25 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
 
         if not vhdl_standards:
             self._vhdl_standard = VHDL.STD_2008
-        #elif len(vhdl_standards) != 1:
-        #    raise RuntimeError("GHDL cannot handle mixed VHDL standards, found %r" % list(vhdl_standards))
+        elif len(vhdl_standards) != 1:
+            raise RuntimeError("DSim vunit compile does not support mixed VHDL standards, found %r" % list(vhdl_standards))
         else:
             self._vhdl_standard = list(vhdl_standards)[0]
 
         # Determine which ieee library to map, based on the VHDL standard in use
-        #libToMap = self._vhdl_std_to_ieee_lib(self._libraries[0].vhdl_standard)
         libToMap = self._vhdl_std_to_ieee_lib(self._vhdl_standard)
-        work = self._rel_path(self._libraries[0].directory.rstrip('vunit_lib'))
+        work_parent = self._rel_path(self._libraries[0].directory.rstrip('vunit_lib'))
+        if not file_exists(work_parent):
+            makedirs(work_parent)
+        work = os.path.join(work_parent, 'dsim_work')
         args = ['map', '-work', work, "-lib", "ieee"]
         if self._in_cloud:
             args += [os.path.join('%STD_LIBS%', libToMap, 'sfe/ieee')]
         else:
             args += [os.getenv("STD_LIBS")+"/"+libToMap+"/sfe/ieee"]
         cmd = self._format_cmd('dlib', args)
-        print("DLIB", cmd)
+        # print("DLIB", cmd)
         proc = subprocess.run(cmd, capture_output=True, text=True)
-        print(proc)
 
 
     def compile_source_file_command(self, source_file):
@@ -200,8 +199,10 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         """
         Returns command to compile a VHDL file
         """
+        work_dir = os.path.join(self._rel_path(source_file.library.directory.rstrip(source_file.library.name)),
+                                self._get_work_dir_name())
         args = []
-        args +=  ["-work", self._rel_path(source_file.library.directory.rstrip(source_file.library.name))]
+        args +=  ["-work", work_dir]
         args += ["-lib", source_file.library.name]
         args += ["%s" % self._vhdl_std_opt(source_file.get_vhdl_standard())]
         args += source_file.compile_options.get("metrics.dsim_vhdl_flags", [])
@@ -214,25 +215,28 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
             % os.path.join(output_path,
                            ("metrics_compile_vhdl_file_%s.log" % source_file.library.name))
         ]
-
         args += ['%s' % self._rel_path(source_file.name)]
         cmd = self._format_cmd('dvhcom', args)
-        print("DVHCOM", cmd)
+        # print("DVHCOM", cmd)
         return cmd
 
     def compile_verilog_file_command(self, source_file):
         """
         Returns commands to compile a Verilog file
         """
+        work_dir = os.path.join(self._rel_path(source_file.library.directory.rstrip(source_file.library.name)),
+                                self._get_work_dir_name())
+        output_path = self._rel_path(self._output_path)
+
         cmd = str(Path(self._prefix) / "dvlcom")
         args = []
-        args += ["-work", source_file.library.directory.rstrip(source_file.library.name)]
+        args += ["-work", work_dir]
         args += ["-lib", source_file.library.name]
         args += source_file.compile_options.get("metrics.dsim_verilog_flags", [])
         args += [
             '-l %s'
             % str(
-                Path(self._output_path)
+                Path(output_path)
                 / ("metrics_compile_verilog_file_%s.log" % source_file.library.name)
             )
         ]
@@ -242,7 +246,7 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
 
         args += ['%s' % source_file.name]
         argsfile = str(
-            Path(self._output_path)
+            Path(output_path)
             / ("metrics_compile_verilog_file_%s.args" % source_file.library.name)
         )
         write_file(argsfile, "\n".join(args))
@@ -261,25 +265,55 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
             val_copy += value[i]
         return val_copy
 
+    def _download_cloud_file(file_name, relative_output_path):
+        """
+        Replaces (or creates new) local copy of file with one downloaded from cloud.
+        """
+        cmd = ['mdc', 'download', file_name]
+        if not run_command(
+                cmd,
+                cwd=relative_output_path,
+                env=self.get_env()):
+            return False
+        downloaded_results = os.path.join(relative_output_path, "_downloaded_" + file_name)
+        local_results = os.path.join(relative_output_path, file_name)
+        if os.path.exists(local_results):
+            os.remove(local_results)
+        os.rename(downloaded_results, local_results)
+        return True
+
     def simulate(  # pylint: disable=too-many-locals
             self, output_path, test_suite_name, config, elaborate_only=False):
         """
         Elaborates and Simulates
         """
         script_path = str(Path(output_path) / self.name)
-        makedirs(script_path)
+        if not file_exists(script_path):
+            makedirs(script_path)
+
+        # If running Metrics DSim Cloud, need to give relative directories
+        # in the information passed through generics.
+        remote_output_path = os.path.relpath(output_path, script_path)
+        remote_tb_path = os.path.relpath(config.tb_path, script_path)
+        encoded_output_path = encode_test_case(output_path)
+        encoded_tb_path = encode_test_case(config.tb_path)
+        encoded_remote_output_path = encode_test_case(remote_output_path)
+        encoded_remote_tb_path = encode_test_case(remote_tb_path)
 
         args = []
         args += ["-exit-on-error 1"]
         args += config.sim_options.get("metrics.dsim_sim_flags", [])
         args += ['-l dsim_simulate.log']
             
-        runner_cfg = config.generics["runner_cfg"]
-
         for name, value in config.generics.items():
             if isinstance(value, PurePath):
                 value = str(value)
             if isinstance(value, str):
+                if (self._in_cloud):
+                    value = value.replace(output_path, remote_output_path)
+                    value = value.replace(encoded_output_path, encoded_remote_output_path)
+                    value = value.replace(config.tb_path, remote_tb_path)
+                    value = value.replace(encoded_tb_path, encoded_remote_tb_path)
                 value = self._escape_nested_quotes(value)
                 args += ['-defparam %s=\"%s\"' % (name, value)]
             else:
@@ -289,6 +323,7 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
             args += ['-L %s' % library.name]
 
         work_path = os.path.relpath(library.directory.rstrip(library.name), script_path)
+        work_path = os.path.join(work_path, self._get_work_dir_name())
         args += ['-work %s' % work_path]
         args += ["+acc+b"]
         args += ["-top %s.%s" % (config.library_name, config.entity_name)]
@@ -298,11 +333,18 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         argsfile = relpath(argsfile, script_path)
 
         cmd = self._format_cmd("dsim", ['-F', '%s' % argsfile])
-        print("DSIM cmd: ", cmd)
+        # print("DSIM cmd: ", cmd)
         if not run_command(
                 cmd,
                 cwd=script_path,
                 env=self.get_env(),
         ):
             return False
+
+        if self._in_cloud:
+            # Download results file from the cloud, move it to where expected.
+            results_file_name = get_result_file_name("")
+            if not self._download_cloud_file(results_file_name, output_path):
+                return False
+
         return True
