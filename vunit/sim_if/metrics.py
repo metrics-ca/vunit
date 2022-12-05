@@ -137,18 +137,18 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         the_string = the_string.replace("\\", "/")
         return the_string
 
-    def _download_cloud_file(self, file_name, relative_output_path):
+    def _download_cloud_file(self, file_name, output_path):
         """
         Replaces (or creates new) local copy of file with one downloaded from cloud.
         """
         cmd = ['mdc', 'download', file_name]
         if not run_command(
                 cmd,
-                cwd=relative_output_path,
+                cwd=output_path,
                 env=self.get_env()):
             return False
-        downloaded_results = os.path.join(relative_output_path, "_downloaded_" + file_name)
-        local_results = os.path.join(relative_output_path, file_name)
+        downloaded_results = os.path.join(output_path, "_downloaded_" + file_name)
+        local_results = os.path.join(output_path, file_name)
         if os.path.exists(local_results):
             os.remove(local_results)
         os.rename(downloaded_results, local_results)
