@@ -21,7 +21,7 @@ from ..vhdl_standard import VHDL
 from . import SimulatorInterface, run_command, ListOfStringOption
 from ..test.suites import get_result_file_name
 from ..test.suites import encode_test_case
-import time
+from warnings import warn
 
 LOGGER = logging.getLogger(__name__)
 
@@ -299,9 +299,34 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         if not file_exists(script_path):
             makedirs(script_path)
 
+        remote_output_path = os.path.relpath(output_path, script_path)
+
+        # Remap compiled libraries to a new work directory, so tests can run in parallel
+        orig_work_path = os.path.relpath(self._libraries[0].directory.rstrip(self._libraries[0].name), script_path)
+        orig_work_path = os.path.join(orig_work_path, self._get_work_dir_name())
+        sim_work_path = os.path.join(remote_output_path, self._get_work_dir_name())
+        # TEMPORARY:  call dlib multiple times until dlib map -all-libs is supported
+        cmd = self._format_cmd("dlib", ['map', '-lib', 'ieee', '-work', sim_work_path, orig_work_path])
+        print("DLIB MAP: ", cmd)
+        if not run_command(
+                    cmd,
+                    cwd=script_path,
+                    env=self.get_env()
+            ):
+                warn("Failed to map lib ieee into simulation work directory")
+
+        for library in  self._libraries:
+            cmd = self._format_cmd("dlib", ['map', '-lib', '%s' % library.name, '-work', sim_work_path, orig_work_path])
+            print("DLIB MAP:", cmd)
+            if not run_command(
+                    cmd,
+                    cwd=script_path,
+                    env=self.get_env()
+            ):
+                warn("Failed to map lib " + library.name + " into simulation work directory")
+
         # If running Metrics DSim Cloud, need to give relative directories
         # in the information passed through generics.
-        remote_output_path = os.path.relpath(output_path, script_path)
         remote_tb_path = os.path.relpath(config.tb_path, script_path)
         encoded_output_path = self._encode_for_runner_cfg_match(output_path)
         encoded_tb_path = self._encode_for_runner_cfg_match(config.tb_path)
@@ -312,7 +337,7 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         args += ["-exit-on-error 1"]
         args += config.sim_options.get("metrics.dsim_sim_flags", [])
         args += ['-l dsim_simulate.log']
-            
+
         for name, value in config.generics.items():
             if isinstance(value, PurePath):
                 value = str(value)
@@ -329,19 +354,16 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
 
         for library in self._libraries:
             args += ['-L %s' % library.name]
-
-        work_path = os.path.relpath(library.directory.rstrip(library.name), script_path)
-        work_path = os.path.join(work_path, self._get_work_dir_name())
-        args += ['-work %s' % work_path]
+        unique_name = "image_" + os.path.basename(Path(output_path))
+        args += ['-work %s' % sim_work_path]
         args += ["+acc+b"]
         args += ["-top %s.%s" % (config.library_name, config.entity_name)]
-            
         argsfile = "%s/dsim_simulate.args" % (script_path)
         write_file(argsfile, "\n".join(args))
         argsfile = relpath(argsfile, script_path)
 
         cmd = self._format_cmd("dsim", ['-F', '%s' % argsfile])
-        # print("DSIM cmd: ", cmd)
+        print("DSIM cmd: ", cmd)
         if not run_command(
                 cmd,
                 cwd=script_path,
