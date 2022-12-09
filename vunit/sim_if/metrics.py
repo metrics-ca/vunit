@@ -121,7 +121,7 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         return "dsim_work"
 
     def _rel_path(self, path):
-        return os.path.relpath(path, os.getcwd())
+        return Path(os.path.relpath(path, os.getcwd()))
 
     def _format_cmd(self, cmd, args):
         metrics_cloud = True
@@ -178,14 +178,15 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         work_parent = self._rel_path(self._libraries[0].directory.rstrip('vunit_lib'))
         if not file_exists(work_parent):
             makedirs(work_parent)
-        work = os.path.join(work_parent, 'dsim_work')
-        args = ['map', '-work', work, "-lib", "ieee"]
+        work = work_parent / 'dsim_work'
+
+        args = ['map', '-work', _linux_format(work), "-lib", "ieee"]
         if self._in_cloud:
-            args += [os.path.join('%STD_LIBS%', libToMap, 'sfe/ieee')]
+            args += [ '%STD_LIBS%/' + libToMap + '/sfe/ieee']
         else:
-            args += [os.getenv("STD_LIBS")+"/"+libToMap+"/sfe/ieee"]
+            args += [str(Path(os.getenv("STD_LIBS")) / libToMap /  'sfe' / 'ieee')]
         cmd = self._format_cmd('dlib', args)
-        # print("DLIB", cmd)
+        print("DLIB", cmd)
         proc = subprocess.run(cmd, capture_output=True, text=True)
 
 
@@ -221,23 +222,22 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         """
         Returns command to compile a VHDL file
         """
-        work_dir = os.path.join(self._rel_path(source_file.library.directory.rstrip(source_file.library.name)),
-                                self._get_work_dir_name())
+        work_dir = self._rel_path(Path(source_file.library.directory.rstrip(source_file.library.name))
+                                  / self._get_work_dir_name())
         args = []
-        args +=  ["-work", work_dir]
+        args +=  ["-work", _linux_format(work_dir)]
         args += ["-lib", source_file.library.name]
         args += ["%s" % self._vhdl_std_opt(source_file.get_vhdl_standard())]
         args += source_file.compile_options.get("metrics.dsim_vhdl_flags", [])
 
         # Assume everything relative to the current directory
         output_path = self._rel_path(self._output_path)
-
         args += [
-            '-l', '%s'
-            % os.path.join(output_path,
-                           ("metrics_compile_vhdl_file_%s.log" % source_file.library.name))
+            '-l', '%s' % _linux_format(
+                Path(output_path) / ("metrics_compile_vhdl_file_%s.log" % source_file.library.name)
+                )
         ]
-        args += ['%s' % self._rel_path(source_file.name)]
+        args += ['%s' % _linux_format(self._rel_path(source_file.name))]
         cmd = self._format_cmd('dvhcom', args)
         # print("DVHCOM", cmd)
         return cmd
@@ -246,34 +246,34 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         """
         Returns commands to compile a Verilog file
         """
-        work_dir = os.path.join(self._rel_path(source_file.library.directory.rstrip(source_file.library.name)),
-                                self._get_work_dir_name())
+        lib_dir = source_file.library.directory.rstrip(source_file.library.name)
+        work_dir = self._rel_path(lib_dir) / self._get_work_dir_name()
+
         output_path = self._rel_path(self._output_path)
 
         args = []
-        args += ["-work", work_dir]
+        args += ["-work", _linux_format(work_dir)]
         args += ["-lib", source_file.library.name]
         args += source_file.compile_options.get("metrics.dsim_verilog_flags", [])
         args += [
             '-l %s'
-            % str(
-                Path(output_path)
-                / ("metrics_compile_verilog_file_%s.log" % source_file.library.name)
+            % _linux_format( output_path /
+                             ("metrics_compile_verilog_file_%s.log" % source_file.library.name)
             )
         ]
 
         for include_dir in source_file.include_dirs:
-            relative_include_dir = self._rel_path(include_dir)
+            relative_include_dir = _linux_format(self._rel_path(include_dir))
             args += ['+incdir+%s' % relative_include_dir]
 
-        args += ['%s' % self._rel_path(source_file.name)]
+        args += ['%s' % _linux_format(self._rel_path(source_file.name))]
         argsfile = str(
             Path(output_path)
             / ("metrics_compile_verilog_file_%s.args" % source_file.library.name)
         )
         write_file(argsfile, "\n".join(args))
         cmd = self._format_cmd("dvlcom", ['-f', '%s' % argsfile])
-        # print("DVLCOM", cmd)
+        print("DVLCOM", cmd)
         return cmd
 
     @staticmethod
@@ -303,10 +303,10 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
 
         # Remap compiled libraries to a new work directory, so tests can run in parallel
         orig_work_path = os.path.relpath(self._libraries[0].directory.rstrip(self._libraries[0].name), script_path)
-        orig_work_path = os.path.join(orig_work_path, self._get_work_dir_name())
-        sim_work_path = os.path.join(remote_output_path, self._get_work_dir_name())
+        orig_work_path = str(Path(orig_work_path) / self._get_work_dir_name())
+        sim_work_path = str(Path(remote_output_path) /  self._get_work_dir_name())
         # TEMPORARY:  call dlib multiple times until dlib map -all-libs is supported
-        cmd = self._format_cmd("dlib", ['map', '-lib', 'ieee', '-work', sim_work_path, orig_work_path])
+        cmd = self._format_cmd("dlib", ['map', '-lib', 'ieee', '-work', _linux_format(sim_work_path), _linux_format(orig_work_path)])
         print("DLIB MAP: ", cmd)
         if not run_command(
                     cmd,
@@ -316,7 +316,7 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
                 warn("Failed to map lib ieee into simulation work directory")
 
         for library in  self._libraries:
-            cmd = self._format_cmd("dlib", ['map', '-lib', '%s' % library.name, '-work', sim_work_path, orig_work_path])
+            cmd = self._format_cmd("dlib", ['map', '-lib', '%s' % library.name, '-work', _linux_format(sim_work_path), _linux_format(orig_work_path)])
             print("DLIB MAP:", cmd)
             if not run_command(
                     cmd,
@@ -354,15 +354,14 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
 
         for library in self._libraries:
             args += ['-L %s' % library.name]
-        unique_name = "image_" + os.path.basename(Path(output_path))
-        args += ['-work %s' % sim_work_path]
+        args += ['-work %s' % _linux_format(sim_work_path)]
         args += ["+acc+b"]
         args += ["-top %s.%s" % (config.library_name, config.entity_name)]
-        argsfile = "%s/dsim_simulate.args" % (script_path)
+        argsfile = Path(script_path) / "dsim_simulate.args"
         write_file(argsfile, "\n".join(args))
         argsfile = relpath(argsfile, script_path)
 
-        cmd = self._format_cmd("dsim", ['-F', '%s' % argsfile])
+        cmd = self._format_cmd("dsim", ['-F', '%s' % _linux_format(argsfile)])
         print("DSIM cmd: ", cmd)
         if not run_command(
                 cmd,
@@ -376,5 +375,17 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
             results_file_name = get_result_file_name("")
             if not self._download_cloud_file(results_file_name, output_path):
                 return False
+            other_files_to_download = config.sim_options.get("metrics.sim_output_files", [])
+            for f in other_files_to_download:
+                if not self._download_cloud_file(f, output_path):
+                    warn("Failed to download " + os.path.join(output_path, f))
 
         return True
+
+
+def _linux_format(path_name):
+    """
+        DSim only runs on linux, so path strings sent to Metrics DSim Cloud need
+        be in linux format.
+        """
+    return str(path_name).replace("\\", "/")
