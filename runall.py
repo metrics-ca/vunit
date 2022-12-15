@@ -61,6 +61,8 @@ doClean = False
 
 # Key paths
 reportDir = "" # Directory to which we will write the report
+startDir = "" # Directory from which the scripts was invoked
+rootDir = "" # Root of the VUNIT repo
 
 doit = True # Set to False if you don't want the script to actually execute
 
@@ -85,7 +87,7 @@ def print_help():
     print_color("\nSYNOPSIS", False, Bold, White, BG_Black)
     print("    {} [OPTIONS]".format(myexe))
     print_color("\nDESCRIPTION", False, Bold, White, BG_Black)
-    print("    PUT DESCRIPTION HERE")
+    print("    This script will run all of the VUNIT tests")
     print_color("\nOPTIONS", False, Bold, White, BG_Black)
     print("    -h, --help")
     print("        Display's this help information")
@@ -117,7 +119,7 @@ def process_args():
     global doClean
 
     try:
-        opts, testDirs = getopt.getopt(sys.argv[1:], "hicCvVrdI",
+        opts, testDirs = getopt.getopt(sys.argv[1:], "hCvVd",
                                                      ["help",
                                                       "color",
                                                       "version",
@@ -145,31 +147,66 @@ def process_args():
 ###################################
 # Builds the sub-script's command for VHDL remote run
 class commandRemoteVUNIT:
-    def __init__(self, tname, numb = 0):
+    def __init__(self, tname, indx, numb = 1):
         self.status = NOT_STARTED
         self.pid = ""
         self.testNum = numb
-        self.testName = tname
+        self.testName = tname.rstrip("\n")
         self.cmd = "mux-farm bash -c 'python3 ./run.py" + "'"
         self.monitorCmd = "mux-status "
         self.time = 0
-        self.indx = numb
+        self.indx = indx
+
+    def execute(self, lh):
+        if verbose:
+            print_str("Running test '{}'".format(self.testName))
+        lh.write("Sending: {}\n".format(self.testName))
+        cmd_list = shlex.split(self.cmd)
+        lh.write("  command is '{}'\n".format(self.cmd))
+
+        os.chdir(os.path.join(".",self.testName))
+        print_debug_str(debug, "Test took us to: {}".format(os.getcwd()))
+        result = subprocess.run(cmd_list, timeout=TIMEOUT, check=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        output = result.stdout.decode('utf-8')
+        lh.write("output of command is '{}'\n".format(output))
+        self.pid = output.rstrip("\n")
+        self.monitorCmd = self.monitorCmd + self.pid
+        self.status = RUNNING
+        self.time = 0
+        os.chdir(startDir)
 
 
-#######################################################
-##                   main
-def main(argv):
-    """  Run vunit examples
-    
-    This script assumes that the environment is set up.
-      -  correct dsim version
-      -  vunit environment
-      The tests to run are in file named "tests_to_run.txt"
-    
-    """
-    
-    process_args()
+###################################
+# Do the actual work
+def execute(class_tlst):
+    retVal = False
+    # open a log file for messages out.
+    if verbose:
+        print_str("Opening log file {}".format(os.path.join(os.getcwd(), "tests_run.log")))
+    lh = open ("tests_run.log", "w")
+    lh.write("-------------------------------------------\n")
+    lh.write("Test run starting\n")
+    lh.write("-------------------------------------------\n")
 
+    print_debug_str(debug, "Running tests from {} ".format(startDir))
+    for test in class_tlst:
+        test.execute(lh)
+    
+    #  attach monitor of  mux jobs
+    #monitor(class_tlst, True, True)
+    monitor(class_tlst, debug, verbose)
+    
+    #  close log file.
+    lh.close()
+    
+    return retVal
+
+
+###################################
+# Get ready to do the work
+def setup():
+    if verbose:
+        print_str("Setting up the tests...")
     if not exists("tests_to_run.txt"): ## find all the run.py files from here down.
         found = False
         sflist = glob.glob('**/run.py', recursive=True)
@@ -192,54 +229,80 @@ def main(argv):
     
     class_tlst = []
     # create classes of  test cases.
-    for i in rlst:
-        if i[0] == "#":
+    indx = 0
+    for name in rlst:
+        if name[0] == "#":
             continue
         # find index to sub in output dir name
-        vupath = i.strip() + "/vunit_out"
+        vupath = name.strip() + "/vunit_out"
         #print("vpath: " + vupath)
         # remove output if exists
         if exists(vupath):
             print("Removing previous: " + vupath)
             shutil.rmtree(vupath)
-        class_tlst.append(commandRemoteVUNIT(i))
+        class_tlst.append(commandRemoteVUNIT(name, indx))
+        indx += 1
     
-    # open a log file for messages out.
-    lh = open ("tests_run.log", "w")
-    lh.write("-------------------------------------------\n")
-    lh.write("Test run starting\n")
-    lh.write("-------------------------------------------\n")
-        
-    here = os.getcwd()
-    #print("We are here: " + here)
-    for t in class_tlst:
-        ##  metrics lib  function for regressions.
-        lh.write("Sending: " + t.testName)
-        cmd_list = shlex.split(t.cmd)
-        for i in cmd_list:
-            lh.write(i + "\n")
-            
-        
-        os.chdir("./" + t.testName.rstrip("\n"))
-        there = os.getcwd()
-        #print("We are there: " + there)
-        result = subprocess.run(cmd_list, timeout=TIMEOUT, check=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        output = result.stdout.decode('utf-8')
-        lh.write(output)
-        t.pid = output.rstrip("\n")
-        t.monitorCmd = t.monitorCmd + t.pid
-        t.status = RUNNING
-        t.time = 0
-        os.chdir(here)
+    return class_tlst
+
+
+###################################
+# Set up the global variables needed by the rest of the process
+def initialize():
+    global rootDir
+    global startDir
+
+    startDir = os.getcwd()
+
+    if not cwd_is_in_repo():
+        print_err("Must be invoked from within the VUNIT repo.")
+        do_exit(-12, debug)
+
+    rootDir = get_root_of_repo(startDir, False)
+    if rootDir == "":
+        print_err("Could not find the root of the VUNIT repo.")
+        do_exit(-13, debug)
+
+
+######################################################################################
+# Main
+######################################################################################
+def main(argv):
+    """  Run vunit examples
     
-    #  attach monitor of  mux jobs
-    #monitor(class_tlst, True, True)
-    monitor(class_tlst, debug, verbose)
+    This script assumes that the environment is set up.
+      -  correct dsim version
+      -  vunit environment
+      The tests to run are in file named "tests_to_run.txt"
     
-    #  close log file.
-    lh.close()
-    
-    return 0
+    """
+
+    programStatus = False
+    set_color_usage(sys.stdout.isatty())
+
+    initialize()
+
+    process_args()
+
+    if not useColor:
+        set_color_usage(False)
+
+    class_tlst = setup()
+
+    try:
+        programStatus = execute(class_tlst)
+
+        os.chdir(startDir)
+
+    except KeyboardInterrupt:
+            print("\nBye")
+            sys.exit(0)
+
+    except:
+        print(traceback.print_exc())
+
+    do_exit(programStatus, debug)
+
     
 if __name__ == '__main__':
     main(sys.argv[1:])
