@@ -191,7 +191,7 @@ def main(argv):
         
         #  map file  Map tests to  random naming
         mfile = os.path.join(out_dir, OutPath, MapFile)
-        #  if now mapping file  continue
+        #  if no mapping file continue
         if not exists(mfile):
             print_err("No Name Mapping File found in " + mfile)
             continue
@@ -200,8 +200,12 @@ def main(argv):
         try:
             mf = open(mfile , "r")
         except:
+            lh.write(">>>>  ERROR: Expected output file was not found\n    " + mfile)
+            lh.write("\n")
+            lh.write("***************************************************************************\n")
             print_err("Could not open '{}' for read".format(mfile))
             continue
+
         mlst = mf.readlines()
         for m in mlst:
             sm = m.split()
@@ -222,9 +226,15 @@ def main(argv):
                     else:
                         passed += 1
             except:
+                lh.write(">>>>  ERROR: Expected test results file was not found\n    " + dtn)
+                lh.write("\n")
+                lh.write("***************************************************************************\n")
                 print_err("Could not open '{}' for read".format(dtn))
                 continue
         
+    if failures + missing <= 0:
+        lh.write("None\n")
+    lh.close()
     if verbose:
         print_str("Passed: " + str(passed) + "\nFailures: " + str(failures) + "\nMissing: " + str(missing))
     return failures + missing
