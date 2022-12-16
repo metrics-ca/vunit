@@ -72,7 +72,7 @@ def print_help():
     print_color("\nSYNOPSIS", False, Bold, White, BG_Black)
     print("    {} [OPTIONS]".format(myexe))
     print_color("\nDESCRIPTION", False, Bold, White, BG_Black)
-    print("    PUT DESCRIPTION HERE")
+    print("    Checks the results of the VUNIT test run for any failures")
     print_color("\nOPTIONS", False, Bold, White, BG_Black)
     print("    -h, --help")
     print("        Display's this help information")
@@ -137,7 +137,7 @@ def main(argv):
     This script checks that the tests that were expected to
       run are run, and returns the status.
       
-      -v will enable a verbose log file output, copy dsim
+      -V will enable a verbose log file output, copy dsim
          output into the vunit_check.output file.
     
     """
@@ -149,7 +149,7 @@ def main(argv):
 
     # setup some default strings
     MapFile = "test_name_to_path_mapping.txt"
-    OutPath = "test_output/"
+    OutPath = "test_output"
     OFile = "output.txt"
     PassMSG = "=N:[VhdlStop]"
     
@@ -158,7 +158,7 @@ def main(argv):
         lh = open ("vunit_check.log", "w")
     except:
         print_err("Could not open output file {}".format(os.path.join(os.getcwd(),"vunit_check.log")))
-        do_exit(-1)
+        do_exit(-1, debug)
         
     #  now open the test listed to be run
     if exists("tests_to_run.txt"):
@@ -168,18 +168,19 @@ def main(argv):
     else:
         print_err("No tests list file was found in 'tests_to_run.txt'")
         print_err("All tests found are listed in file 'test_found_list.txt'")
-        do_exit(-1)
+        do_exit(-1, debug)
     
     ##  go through the tests 
     passed = 0
     failures = 0
     missing = 0
-    for t in rlst:
-        if t[0] == "#":
+    for test in rlst:
+        if test[0] == "#":
             continue
-        t = t.strip()
+        test = test.strip()
+        print_debug_str(debug, "Checking test {}".format(test))
         
-        out_dir = os.path.join(".", t, "vunit_out")
+        out_dir = os.path.join(".", test, "vunit_out")
         if not exists(out_dir):
             missing += 1
             lh.write(">>>>  ERROR: Expected output directory was not found\n    " + out_dir)
@@ -224,10 +225,11 @@ def main(argv):
                 print_err("Could not open '{}' for read".format(dtn))
                 continue
         
-    print("Passed: " + str(passed) + "\nFailures: " + str(failures) + "\nMissing: " + str(missing))
-    return (failures, missing)
+    if verbose:
+        print_str("Passed: " + str(passed) + "\nFailures: " + str(failures) + "\nMissing: " + str(missing))
+    return failures + missing
     
 if __name__ == '__main__':
     stat = main(sys.argv[1:])
-    do_exit(stat)
+    do_exit(stat, debug)
 
