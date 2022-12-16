@@ -186,7 +186,7 @@ def main(argv):
             lh.write(">>>>  ERROR: Expected output directory was not found\n    " + out_dir)
             lh.write("\n")
             lh.write("***************************************************************************\n")
-            print_err("Expected output: " + out_dir + " Was not found")
+            print_err("Expected output directory: " + os.path.join(os.getcwd(), out_dir) + " Was not found")
             continue
         
         #  map file  Map tests to  random naming
