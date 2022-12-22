@@ -118,7 +118,7 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         raise ValueError("Invalid VHDL standard %s" % vhdl_standard)
 
     def _get_work_dir_name(self):
-        return "dsim_work"
+        return "dsim_vunit_work"
 
     def _rel_path(self, path):
         return Path(os.path.relpath(path, os.getcwd()))
@@ -178,7 +178,7 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         work_parent = self._rel_path(self._libraries[0].directory.rstrip('vunit_lib'))
         if not file_exists(work_parent):
             makedirs(work_parent)
-        work = work_parent / 'dsim_work'
+        work = work_parent / self._get_work_dir_name()
 
         args = ['map', '-work', _linux_format(work), "-lib", "ieee"]
         if self._in_cloud:
@@ -186,7 +186,7 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         else:
             args += [str(Path(os.getenv("STD_LIBS")) / libToMap /  'sfe' / 'ieee')]
         cmd = self._format_cmd('dlib', args)
-        print("DLIB", cmd)
+        #print("DLIB MAP ieee: ", cmd)
         proc = subprocess.run(cmd, capture_output=True, text=True)
 
 
@@ -239,7 +239,7 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         ]
         args += ['%s' % _linux_format(self._rel_path(source_file.name))]
         cmd = self._format_cmd('dvhcom', args)
-        # print("DVHCOM", cmd)
+        #print("DVHCOM ", cmd)
         return cmd
 
     def compile_verilog_file_command(self, source_file):
@@ -273,7 +273,6 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         )
         write_file(argsfile, "\n".join(args))
         cmd = self._format_cmd("dvlcom", ['-f', '%s' % argsfile])
-        print("DVLCOM", cmd)
         return cmd
 
     @staticmethod
@@ -299,37 +298,25 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         if not file_exists(script_path):
             makedirs(script_path)
 
-        remote_output_path = os.path.relpath(output_path, script_path)
-
         # Remap compiled libraries to a new work directory, so tests can run in parallel
         orig_work_path = os.path.relpath(self._libraries[0].directory.rstrip(self._libraries[0].name), script_path)
         orig_work_path = str(Path(orig_work_path) / self._get_work_dir_name())
-        sim_work_path = str(Path(remote_output_path) /  self._get_work_dir_name())
-        # TEMPORARY:  call dlib multiple times until dlib map -all-libs is supported
-        cmd = self._format_cmd("dlib", ['map', '-lib', 'ieee', '-work', _linux_format(sim_work_path), _linux_format(orig_work_path)])
-        print("DLIB MAP: ", cmd)
+        sim_work_path = str(self._get_work_dir_name())
+        cmd = self._format_cmd("dlib", ['map', '-all-libs', '-work', _linux_format(sim_work_path), _linux_format(orig_work_path)])
+        #print("DLIB MAP", cmd)
         if not run_command(
                     cmd,
                     cwd=script_path,
                     env=self.get_env()
             ):
-                warn("Failed to map lib ieee into simulation work directory")
-
-        for library in  self._libraries:
-            cmd = self._format_cmd("dlib", ['map', '-lib', '%s' % library.name, '-work', _linux_format(sim_work_path), _linux_format(orig_work_path)])
-            print("DLIB MAP:", cmd)
-            if not run_command(
-                    cmd,
-                    cwd=script_path,
-                    env=self.get_env()
-            ):
-                warn("Failed to map lib " + library.name + " into simulation work directory")
+                warn("Failed to map compiled libraries work directory into simulation work directory")
 
         # If running Metrics DSim Cloud, need to give relative directories
         # in the information passed through generics.
         remote_tb_path = os.path.relpath(config.tb_path, script_path)
         encoded_output_path = self._encode_for_runner_cfg_match(output_path)
         encoded_tb_path = self._encode_for_runner_cfg_match(config.tb_path)
+        remote_output_path = os.path.relpath(output_path, script_path)
         encoded_remote_output_path = self._encode_for_runner_cfg_match(remote_output_path)
         encoded_remote_tb_path = self._encode_for_runner_cfg_match(remote_tb_path)
 
@@ -362,7 +349,7 @@ class MetricsInterface(  # pylint: disable=too-many-instance-attributes
         argsfile = relpath(argsfile, script_path)
 
         cmd = self._format_cmd("dsim", ['-F', '%s' % _linux_format(argsfile)])
-        print("DSIM cmd: ", cmd)
+        #print("DSIM ", cmd)
         if not run_command(
                 cmd,
                 cwd=script_path,
