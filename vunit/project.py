@@ -4,7 +4,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2021, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2022, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 Functionality to represent and operate on a HDL code project
@@ -65,13 +65,13 @@ class Project(object):  # pylint: disable=too-many-instance-attributes
             raise RuntimeError("Illegal library name 'work'")
 
         if library_name in self._libraries:
-            raise ValueError("Library %s already exists" % library_name)
+            raise ValueError(f"Library {library_name!s} already exists")
 
         lower_name = library_name.lower()
         if lower_name in self._lower_library_names_dict:
             raise RuntimeError(
-                "Library name %r not case-insensitive unique. Library name %r previously defined"
-                % (library_name, self._lower_library_names_dict[lower_name])
+                f"Library name {library_name!r} not case-insensitive unique. "
+                f"Library name {self._lower_library_names_dict[lower_name]!r} previously defined"
             )
 
     def add_builtin_library(self, logical_name):
@@ -98,10 +98,10 @@ class Project(object):  # pylint: disable=too-many-instance-attributes
 
         if is_external:
             if not dpath.exists():
-                raise ValueError("External library %r does not exist" % dstr)
+                raise ValueError(f"External library {dstr!r} does not exist")
 
             if not dpath.is_dir():
-                raise ValueError("External library must be a directory. Got %r" % dstr)
+                raise ValueError(f"External library must be a directory. Got {dstr!r}")
 
         library = Library(logical_name, dstr, vhdl_standard, is_external=is_external)
         LOGGER.debug("Adding library %s with path %s", logical_name, dstr)
@@ -126,7 +126,7 @@ class Project(object):  # pylint: disable=too-many-instance-attributes
         """
         fname = file_name if isinstance(file_name, Path) else Path(file_name)
         if not fname.exists():
-            raise ValueError("File %r does not exist" % str(fname))
+            raise ValueError(f"File {str(fname)!r} does not exist")
 
         LOGGER.debug("Adding source file %s to library %s", str(fname), library_name)
         library = self._libraries[library_name]
@@ -198,6 +198,23 @@ class Project(object):  # pylint: disable=too-many-instance-attributes
         real_library_name = self._lower_library_names_dict[library_name.lower()]
         return self._libraries[real_library_name]
 
+    @staticmethod
+    def _handle_ambiguous_architecture(source_file, ref, primary_unit):
+        """
+        Pretty print architecture ambiguity
+        """
+        LOGGER.error(
+            "Ambiguous direct entity instantiation of %s.%s in %s.\n  "
+            "Remove all but one architecture or specify one of:\n  %s",
+            ref.library,
+            ref.design_unit,
+            source_file.name,
+            "\n  ".join(
+                f"{idx}. {name} ({location})"
+                for idx, (name, location) in enumerate(primary_unit.architecture_names.items(), 1)
+            ),
+        )
+
     def _find_other_vhdl_design_unit_dependencies(  # pylint: disable=too-many-branches
         self, source_file, depend_on_package_body, implementation_dependencies
     ):
@@ -246,6 +263,9 @@ class Project(object):  # pylint: disable=too-many-instance-attributes
                 for name in names:
                     if name is None:
                         # Was not a reference to a specific architecture
+                        if len(primary_unit.architecture_names) > 1:
+                            self._handle_ambiguous_architecture(source_file, ref, primary_unit)
+                            raise RuntimeError(f"Ambiguous use of {ref.library}.{ref.design_unit}")
                         continue
 
                     if name in primary_unit.architecture_names:
