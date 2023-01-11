@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2021, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2022, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 Utilities for integrating with Vivado
@@ -13,11 +13,13 @@ from os import makedirs
 from pathlib import Path
 
 
-def add_from_compile_order_file(vunit_obj, compile_order_file, dependency_scan_defaultlib=True):
+def add_from_compile_order_file(
+    vunit_obj, compile_order_file, dependency_scan_defaultlib=True, fail_on_non_hdl_files=True
+):  # pylint: disable=too-many-locals
     """
     Add Vivado IP:s from a compile order file
     """
-    compile_order, libraries, include_dirs = _read_compile_order(compile_order_file)
+    compile_order, libraries, include_dirs = _read_compile_order(compile_order_file, fail_on_non_hdl_files)
 
     # Create libraries
     for library_name in libraries:
@@ -63,7 +65,7 @@ def create_compile_order_file(project_file, compile_order_file, vivado_path=None
     """
     Create compile file from Vivado project
     """
-    print("Generating Vivado project compile order into %s ..." % str(Path(compile_order_file).resolve()))
+    print(f"Generating Vivado project compile order into {str(Path(compile_order_file).resolve())} ...")
 
     fpath = Path(compile_order_file)
     if not fpath.parent.exists():
@@ -77,7 +79,7 @@ def create_compile_order_file(project_file, compile_order_file, vivado_path=None
     )
 
 
-def _read_compile_order(file_name):
+def _read_compile_order(file_name, fail_on_non_hdl_files):
     """
     Read the compile order file and filter out duplicate files
     """
@@ -90,7 +92,13 @@ def _read_compile_order(file_name):
 
         for line in ifile.readlines():
             library_name, file_type, file_name = line.strip().split(",", 2)
-            assert file_type in ("Verilog", "VHDL", "Verilog Header")
+
+            if file_type not in ("Verilog", "VHDL", "Verilog Header"):
+                if fail_on_non_hdl_files:
+                    raise RuntimeError(f"Unsupported compile order file: {file_name}")
+                print(f"Compile order file ignored: {file_name}")
+                continue
+
             libraries.add(library_name)
 
             # Vivado generates duplicate files for different IP:s
@@ -115,7 +123,7 @@ def run_vivado(tcl_file_name, tcl_args=None, cwd=None, vivado_path=None):
     Note: the shell=True is important in windows where Vivado is just a bat file.
     """
     vivado = "vivado" if vivado_path is None else str(Path(vivado_path).resolve() / "bin" / "vivado")
-    cmd = "{} -nojournal -nolog -notrace -mode batch -source {}".format(vivado, str(Path(tcl_file_name).resolve()))
+    cmd = f"{vivado} -nojournal -nolog -notrace -mode batch -source {str(Path(tcl_file_name).resolve())}"
     if tcl_args is not None:
         cmd += " -tclargs " + " ".join([str(val) for val in tcl_args])
 

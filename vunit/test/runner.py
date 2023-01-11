@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2021, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2022, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 Provided functionality to run a suite of test in a robust way
@@ -90,7 +90,7 @@ class TestRunner(object):  # pylint: disable=too-many-instance-attributes
                     print("Running test: " + test_name)
 
         if self._is_verbose:
-            print("Running %i tests" % num_tests)
+            print(f"Running {num_tests:d} tests")
             print()
 
         self._report.set_expected_num_tests(num_tests)
@@ -149,8 +149,8 @@ class TestRunner(object):  # pylint: disable=too-many-instance-attributes
 
                 with self._stdout_lock():
                     for test_name in test_suite.test_names:
-                        print("Starting %s" % test_name)
-                    print("Output file: %s" % output_file_name)
+                        print(f"Starting {test_name!s}")
+                    print(f"Output file: {output_file_name!s}")
 
                 self._run_test_suite(test_suite, write_stdout, num_tests, output_path, output_file_name)
 
@@ -294,7 +294,7 @@ class TestRunner(object):  # pylint: disable=too-many-instance-attributes
 
         for test_suite in test_suites:
             test_output = self._get_output_path(test_suite.name)
-            mapping.add("%s %s" % (Path(test_output).name, test_suite.name))
+            mapping.add(f"{Path(test_output).name!s} {test_suite.name!s}")
 
         # Sort by everything except hash
         mapping = sorted(mapping, key=lambda value: value[value.index(" ") :])
@@ -307,7 +307,7 @@ class TestRunner(object):  # pylint: disable=too-many-instance-attributes
         """
         Print contents of output file if it exists
         """
-        with Path(output_file_name).open("r") as fread:
+        with Path(output_file_name).open("r", encoding="utf-8") as fread:
             for line in fread.readlines():
                 self._stdout_ansi.write(line)
 

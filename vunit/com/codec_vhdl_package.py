@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2021, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2022, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 Module containing the CodecVHDLPackage class.
@@ -222,15 +222,13 @@ class CodecVHDLPackage(VHDLPackage):
                 for element in record.elements:
                     for identifier in element.identifier_list:
                         if identifier != "msg_type":
-                            parameter_list.append(
-                                "    constant %s : %s" % (identifier, element.subtype_indication.code)
-                            )
+                            parameter_list.append(f"    constant {identifier!s} : {element.subtype_indication.code!s}")
                             parameter_type_list.append(element.subtype_indication.type_mark)
-                            encoding_list.append("encode(%s)" % identifier)
+                            encoding_list.append(f"encode({identifier!s})")
                         else:
-                            encoding_list.append("encode(%s'(%s))" % (element.subtype_indication.code, value))
+                            encoding_list.append(f"encode({element.subtype_indication.code!s}'({value!s}))")
 
-                if parameter_list == []:
+                if not parameter_list:
                     parameter_part = ""
                     alias_signature = value + "[return string];"
                 else:

@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this file,
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Copyright (c) 2014-2021, Lars Asplund lars.anders.asplund@gmail.com
+# Copyright (c) 2014-2022, Lars Asplund lars.anders.asplund@gmail.com
 
 """
 Preprocessing of check functions
@@ -39,7 +39,7 @@ class CheckPreprocessor(object):
                 offset_to_point_before_closing_paranthesis,
             ) = self._extract_relation(code, match)
             if relation:
-                context_msg_parameter = ", context_msg => %s" % relation.make_context_msg()
+                context_msg_parameter = f", context_msg => {relation.make_context_msg()!s}"
                 code = (
                     code[: match.end("parameters") + offset_to_point_before_closing_paranthesis]
                     + context_msg_parameter
@@ -81,7 +81,7 @@ class CheckPreprocessor(object):
 
         if not relation:
             raise SyntaxError(
-                "Failed to find relation in %s" % code[check.start("call") : check.end("parameters") + index]
+                f"Failed to find relation in {(code[check.start('call') : check.end('parameters') + index])!s}"
             )
 
         return relation, index - 1
@@ -221,10 +221,10 @@ class Relation(object):
         self._right = right
 
     def make_context_msg(self):
-        return '"Expected %s %s %s. Left is " & to_string(%s) & ". Right is " & to_string(%s) & "."' % (
-            self._left.replace('"', '""'),
-            self._operand,
-            self._right.replace('"', '""'),
-            self._left,
-            self._right,
+        eleft = self._left.replace('"', '""')
+        eright = self._right.replace('"', '""')
+        return (
+            f'"Expected {eleft!s} {self._operand!s} {eright!s}. '
+            f'Left is " & to_string({self._left!s}) & ". '
+            f'Right is " & to_string({self._right!s}) & "."'
         )
