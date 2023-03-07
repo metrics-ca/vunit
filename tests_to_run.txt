@@ -1,16 +1,15 @@
 examples/vhdl/uart
-vunit/verilog/check
 vunit/vhdl/string_ops
 vunit/vhdl/com
 vunit/vhdl/random
 vunit/vhdl/data_types
 vunit/vhdl/dictionary
 vunit/vhdl/path
-vunit/vhdl/check
 vunit/vhdl/run
 vunit/vhdl/logging
 vunit/vhdl/array
 #
+#vunit/verilog/check
 #examples/verilog/uart
 #examples/verilog/verilog_ams
 #examples/verilog/user_guide
@@ -33,3 +32,4 @@ vunit/vhdl/array
 #tests/acceptance/artificial/vhdl
 #vunit/vhdl/JSON-for-VHDL/tests/VUnit
 #vunit/vhdl/verification_components
+#vunit/vhdl/check
