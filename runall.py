@@ -49,7 +49,7 @@ else:
     os.environ['DSIM_CMD_OPTIONS'] = " -timescale 1ns/1ps"
 
 # Constants
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 SUCCESS = 0
 
 
@@ -58,6 +58,7 @@ debug = False
 useColor = False
 verbose = False
 doClean = False
+email = ""
 
 # Key paths
 reportDir = "" # Directory to which we will write the report
@@ -74,6 +75,7 @@ def print_usage(retVal):
     print("{--version}", end=" ")
     print("{--verbose}", end=" ")
     print("{--color}", end=" ")
+    print("{--email=<name>}", end=" ")
     print("")
     do_exit(retVal, debug)
 
@@ -97,6 +99,10 @@ def print_help():
     print("        Print out each test as it is executed")
     print("    -C, --color")
     print("        Enable color output")
+    print("    --email=<name>")
+    print("        If the results need to be emailed to someone, please provide the email name")
+    print("        The results will be emailed to <name>@metrics.ca")
+    print("        The default is to not email the results")
     print_color("\nCOPYRIGHT", False, Bold, White, BG_Black)
     copyright = get_copyright()
     print("    {}".format(copyright))
@@ -117,6 +123,9 @@ def process_args():
     global verbose
     global useColor
     global doClean
+    global email
+
+    foundEmail = False
 
     try:
         opts, testDirs = getopt.getopt(sys.argv[1:], "hCvVd",
@@ -124,6 +133,7 @@ def process_args():
                                                       "color",
                                                       "version",
                                                       "verbose",
+                                                      "email=",
                                                       "debug"])
     except getopt.GetoptError as err:
         print_err(str(err))
@@ -142,6 +152,9 @@ def process_args():
             debug = check_for_dup_arg(debug)
         elif o in ("-C", "--color"):
             useColor = check_for_dup_arg(useColor)
+        elif o in ("--email"):
+            foundEmail = check_for_dup_arg(foundEmail)
+            email = a
 
 
 ###################################
@@ -160,16 +173,20 @@ class commandRemoteVUNIT:
     def execute(self, lh):
         if verbose:
             print_str("Running test '{}'".format(self.testName))
-        lh.write("Sending: {}\n".format(self.testName))
+        lh.write("Sending: '{}' to mux-farm\n".format(self.testName))
         cmd_list = shlex.split(self.cmd)
-        lh.write("  command is '{}'\n".format(self.cmd))
+        lh.write("  Command is '{}'\n".format(self.cmd))
 
         os.chdir(os.path.join(".",self.testName))
         print_debug_str(debug, "Test took us to: {}".format(os.getcwd()))
+        lh.write("  Running test in {}\n".format(os.getcwd()))
         result = subprocess.run(cmd_list, timeout=TIMEOUT, check=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         output = result.stdout.decode('utf-8')
-        lh.write("output of command is '{}'\n".format(output))
         self.pid = output.rstrip("\n")
+        if debug:
+            lh.write("  Output of command is '{}'\n".format(output))
+        else:
+            lh.write("  Process ID is {}\n".format(self.pid))
         self.monitorCmd = self.monitorCmd + self.pid
         self.status = RUNNING
         self.time = 0
@@ -192,13 +209,26 @@ def execute(class_tlst):
     for test in class_tlst:
         test.execute(lh)
     
-    #  attach monitor of  mux jobs
+    #  attach monitor of mux jobs
     #monitor(class_tlst, True, True)
-    monitor(class_tlst, debug, verbose)
+    retVal = monitor(class_tlst, debug, verbose)
     
+    if not retVal:
+        lh.write("All test jobs completed successfully.\n")
+    else:
+        lh.write("Monitor of test jobs reported {}\n".format(retVal))
+
+    lh.write("-------------------------------------------\n")
+    lh.write("Test run completed\n")
+    lh.write("-------------------------------------------\n")
     #  close log file.
     lh.close()
     
+
+    if email:
+        if verbose:
+            print_str("Sending email...")
+        do_cmd("cat tests_run.log | mail -s 'VUNIT Regression results' {}@metrics.ca".format(email))
     return retVal
 
 
