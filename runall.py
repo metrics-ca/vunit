@@ -218,6 +218,8 @@ def execute(class_tlst):
     else:
         lh.write("Monitor of test jobs reported {}\n".format(retVal))
 
+    lh.write("\nRun ./check_vunit_regress.py -VC to check results.\n\n")
+
     lh.write("-------------------------------------------\n")
     lh.write("Test run completed\n")
     lh.write("-------------------------------------------\n")
@@ -268,7 +270,7 @@ def setup():
         #print("vpath: " + vupath)
         # remove output if exists
         if exists(vupath):
-            print("Removing previous: " + vupath)
+            print_warn("Removing previous: " + vupath)
             shutil.rmtree(vupath)
         class_tlst.append(commandRemoteVUNIT(name, indx))
         indx += 1
