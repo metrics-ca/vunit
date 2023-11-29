@@ -165,7 +165,7 @@ class commandRemoteVUNIT:
         self.pid = ""
         self.testNum = numb
         self.testName = tname.rstrip("\n")
-        self.mfi = "--image {} ".format(os.environ['MUX_FARM_IMAGE']) if 'MUX_FARM_IMAGE' in os.environ else ""
+        self.mfi = " --image {} ".format(os.environ['MUX_FARM_IMAGE']) if 'MUX_FARM_IMAGE' in os.environ else ""
         self.cmd = "mux-farm" + self.mfi + " bash -c 'python3 ./run.py" + "'" 
         self.monitorCmd = "mux-status "
         self.time = 0
