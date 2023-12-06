@@ -181,7 +181,13 @@ class commandRemoteVUNIT:
         os.chdir(os.path.join(".",self.testName))
         print_debug_str(debug, "Test took us to: {}".format(os.getcwd()))
         lh.write("  Running test in {}\n".format(os.getcwd()))
-        result = subprocess.run(cmd_list, timeout=TIMEOUT, check=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+        try:
+            result = subprocess.run(cmd_list, timeout=TIMEOUT, check=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        except subprocess.CalledProcessError as e:
+            print_warn("Attempt to launch on muxfarm failed version failed. ");
+            print_warn("   stdout:{} ".format(e.stdout.decode('utf-8')))
+
         output = result.stdout.decode('utf-8')
         self.pid = output.rstrip("\n")
         if debug:
